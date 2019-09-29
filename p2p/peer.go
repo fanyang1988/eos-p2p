@@ -139,11 +139,18 @@ func (p *Peer) Connect() error {
 }
 
 // Close send GoAway message then close connection
-func (p *Peer) Close(reason eos.GoAwayReason) {
+func (p *Peer) Close(reason eos.GoAwayReason) error {
+	p.SendGoAway(reason)
+	return p.ClosePeer()
+}
+
+// ClosePeer close peer connect
+func (p *Peer) ClosePeer() error {
 	if p.connection != nil {
-		p.SendGoAway(reason)
-		p.connection.Close()
+		return p.connection.Close()
 	}
+
+	return nil
 }
 
 func (p *Peer) Write(bytes []byte) (int, error) {

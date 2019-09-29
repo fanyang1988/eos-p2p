@@ -44,6 +44,7 @@ func (s *syncManager) OnHandshakeMsg(peer *Peer, msg *eos.HandshakeMessage) {
 		err := s.sendSyncRequest(peer)
 		if err != nil {
 			//errChannel <- errors.Wrap(err, "handshake: sending sync request")
+			peer.ClosePeer()
 		}
 		s.IsCatchingUp = true
 	} else {
@@ -61,6 +62,8 @@ func (s *syncManager) OnHandshakeMsg(peer *Peer, msg *eos.HandshakeMessage) {
 
 // OnGoAwayMsg handler func imp
 func (s *syncManager) OnGoAwayMsg(peer *Peer, msg *eos.GoAwayMessage) {
+	p2pLog.Warn("peer goaway", zap.String("reason", msg.Reason.String()))
+	peer.ClosePeer()
 }
 
 // OnTimeMsg handler func imp
@@ -76,6 +79,7 @@ func (s *syncManager) OnNoticeMsg(peer *Peer, msg *eos.NoticeMessage) {
 			err := s.sendSyncRequest(peer)
 			if err != nil {
 				//errChannel <- errors.Wrap(err, "noticeMessage: sending sync request")
+				peer.ClosePeer()
 			}
 		}
 	}
@@ -102,6 +106,8 @@ func (s *syncManager) OnSignedBlock(peer *Peer, msg *eos.SignedBlock) {
 				blockID, err := msg.BlockID()
 				if err != nil {
 					//errChannel <- errors.Wrap(err, "getting block id")
+					peer.Close(eos.GoAwayValidation)
+					return
 				}
 				peer.handshakeInfo.HeadBlockNum = blockNum
 				peer.handshakeInfo.HeadBlockID = blockID
@@ -109,12 +115,14 @@ func (s *syncManager) OnSignedBlock(peer *Peer, msg *eos.SignedBlock) {
 				err = peer.SendHandshake(peer.handshakeInfo)
 				if err != nil {
 					//errChannel <- errors.Wrap(err, "send handshake")
+					peer.ClosePeer()
 				}
 				p2pLog.Debug("Send new handshake", zap.Object("handshakeInfo", peer.handshakeInfo))
 			} else {
 				err := s.sendSyncRequest(peer)
 				if err != nil {
 					//errChannel <- errors.Wrap(err, "signed block: sending sync request")
+					peer.ClosePeer()
 				}
 			}
 		}

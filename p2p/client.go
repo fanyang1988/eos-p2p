@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/eoscanada/eos-go"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -55,12 +54,6 @@ func (c *Client) read(peer *Peer) error {
 		envelope := NewEnvelope(peer, peer, packet)
 		for _, handle := range c.handlers {
 			handle.Handle(envelope)
-		}
-
-		switch m := packet.P2PMessage.(type) {
-		case *eos.GoAwayMessage:
-			p2pLog.Warn("peer goaway", zap.String("reason", m.Reason.String()))
-			return nil
 		}
 	}
 }
