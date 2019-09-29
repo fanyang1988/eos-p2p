@@ -8,17 +8,12 @@ import (
 	"io"
 	"net"
 	"time"
-
-	"github.com/pkg/errors"
-
-	"go.uber.org/zap"
-
-	"go.uber.org/zap/zapcore"
-
 	"runtime"
-
 	"bufio"
 
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"github.com/eoscanada/eos-go"
 	"github.com/eoscanada/eos-go/ecc"
 )

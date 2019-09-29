@@ -5,8 +5,9 @@ import (
 	"flag"
 	"log"
 
-	"github.com/fanyang1988/eos-p2p/p2p"
 	"go.uber.org/zap"
+
+	"github.com/fanyang1988/eos-p2p/p2p"
 )
 
 var peer = flag.String("peer", "localhost:9001", "peer to connect to")

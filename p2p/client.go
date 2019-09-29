@@ -2,14 +2,11 @@ package p2p
 
 import (
 	"math"
-
-	"github.com/pkg/errors"
-
-	"go.uber.org/zap"
-
 	"time"
 
 	"github.com/eoscanada/eos-go"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 type Client struct {
