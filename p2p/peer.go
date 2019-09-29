@@ -1,21 +1,21 @@
 package p2p
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
-	"time"
 	"runtime"
-	"bufio"
+	"time"
 
+	"github.com/eoscanada/eos-go"
+	"github.com/eoscanada/eos-go/ecc"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"github.com/eoscanada/eos-go"
-	"github.com/eoscanada/eos-go/ecc"
 )
 
 type Peer struct {
@@ -174,6 +174,14 @@ func (p *Peer) Connect(errChan chan error) (ready chan bool) {
 	return
 }
 
+// Close send GoAway message then close connection
+func (p *Peer) Close(reason eos.GoAwayReason) {
+	if p.connection != nil {
+		p.SendGoAway(reason)
+		p.connection.Close()
+	}
+}
+
 func (p *Peer) Write(bytes []byte) (int, error) {
 
 	return p.connection.Write(bytes)
@@ -200,6 +208,16 @@ func (p *Peer) WriteP2PMessage(message eos.P2PMessage) (err error) {
 	}
 
 	return nil
+}
+
+// SendGoAway send go away message to peer
+func (p *Peer) SendGoAway(reason eos.GoAwayReason) error {
+	p2pLog.Debug("SendGoAway", zap.String("reson", reason.String()))
+
+	return errors.WithStack(p.WriteP2PMessage(&eos.GoAwayMessage{
+		Reason: reason,
+		NodeID: p.NodeID,
+	}))
 }
 
 func (p *Peer) SendSyncRequest(startBlockNum uint32, endBlockNumber uint32) (err error) {
