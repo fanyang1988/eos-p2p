@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"sync"
 	"time"
 
 	"github.com/eoscanada/eos-go"
@@ -13,6 +14,8 @@ type Client struct {
 	handlers    []Handler
 	readTimeout time.Duration
 	sync        *syncManager
+
+	wg sync.WaitGroup
 }
 
 func NewClient(peer *Peer, needSync bool) *Client {
@@ -43,12 +46,11 @@ func (c *Client) RegisterHandler(handler Handler) {
 	c.handlers = append(c.handlers, handler)
 }
 
-func (c *Client) read(peer *Peer, errChannel chan error) {
+func (c *Client) read(peer *Peer) error {
 	for {
 		packet, err := peer.Read()
 		if err != nil {
-			errChannel <- errors.Wrapf(err, "read message from %s", peer.Address)
-			break
+			return errors.Wrapf(err, "read message from %s", peer.Address)
 		}
 
 		envelope := NewEnvelope(peer, peer, packet)
@@ -58,7 +60,8 @@ func (c *Client) read(peer *Peer, errChannel chan error) {
 
 		switch m := packet.P2PMessage.(type) {
 		case *eos.GoAwayMessage:
-			errChannel <- errors.Wrapf(err, "GoAwayMessage reason %s", m.Reason)
+			p2pLog.Warn("peer goaway", zap.String("reason", m.Reason.String()))
+			return nil
 
 		case *eos.HandshakeMessage:
 			if c.sync == nil {
@@ -66,8 +69,7 @@ func (c *Client) read(peer *Peer, errChannel chan error) {
 				m.P2PAddress = peer.Name
 				err = peer.WriteP2PMessage(m)
 				if err != nil {
-					errChannel <- errors.Wrap(err, "HandshakeMessage")
-					break
+					return errors.Wrap(err, "HandshakeMessage")
 				}
 				p2pLog.Debug("Handshake resent", zap.String("other", m.P2PAddress))
 
@@ -76,7 +78,7 @@ func (c *Client) read(peer *Peer, errChannel chan error) {
 				c.sync.originHeadBlock = m.HeadNum
 				err = c.sync.sendSyncRequest(peer)
 				if err != nil {
-					errChannel <- errors.Wrap(err, "handshake: sending sync request")
+					//errChannel <- errors.Wrap(err, "handshake: sending sync request")
 				}
 				c.sync.IsCatchingUp = true
 			}
@@ -87,14 +89,12 @@ func (c *Client) read(peer *Peer, errChannel chan error) {
 					c.sync.originHeadBlock = pendingNum
 					err = c.sync.sendSyncRequest(peer)
 					if err != nil {
-						errChannel <- errors.Wrap(err, "noticeMessage: sending sync request")
+						//errChannel <- errors.Wrap(err, "noticeMessage: sending sync request")
 					}
 				}
 			}
 		case *eos.SignedBlock:
-
 			if c.sync != nil {
-
 				blockNum := m.BlockNumber()
 				c.sync.headBlock = blockNum
 				if c.sync.requestedEndBlock == blockNum {
@@ -103,21 +103,21 @@ func (c *Client) read(peer *Peer, errChannel chan error) {
 						p2pLog.Debug("In sync with last handshake")
 						blockID, err := m.BlockID()
 						if err != nil {
-							errChannel <- errors.Wrap(err, "getting block id")
+							//errChannel <- errors.Wrap(err, "getting block id")
 						}
 						peer.handshakeInfo.HeadBlockNum = blockNum
 						peer.handshakeInfo.HeadBlockID = blockID
 						peer.handshakeInfo.HeadBlockTime = m.SignedBlockHeader.Timestamp.Time
 						err = peer.SendHandshake(peer.handshakeInfo)
 						if err != nil {
-							errChannel <- errors.Wrap(err, "send handshake")
+							//errChannel <- errors.Wrap(err, "send handshake")
 						}
 						p2pLog.Debug("Send new handshake",
 							zap.Object("handshakeInfo", peer.handshakeInfo))
 					} else {
 						err = c.sync.sendSyncRequest(peer)
 						if err != nil {
-							errChannel <- errors.Wrap(err, "signed block: sending sync request")
+							//errChannel <- errors.Wrap(err, "signed block: sending sync request")
 						}
 					}
 				}
@@ -133,22 +133,35 @@ func triggerHandshake(peer *Peer) error {
 func (c *Client) Start() error {
 	p2pLog.Info("Starting client")
 
-	errorChannel := make(chan error, 1)
-	readyChannel := c.peer.Connect(errorChannel)
+	err := c.peer.Connect()
+	if err != nil {
+		return errors.Wrap(err, "connect error")
+	}
 
-	for {
-		select {
-		case <-readyChannel:
-			go c.read(c.peer, errorChannel)
-			if c.peer.handshakeInfo != nil {
+	c.wg.Add(1)
 
-				err := triggerHandshake(c.peer)
-				if err != nil {
-					return errors.Wrap(err, "connect and start: trigger handshake")
-				}
-			}
-		case err := <-errorChannel:
-			return errors.Wrap(err, "start client")
+	// FIXME: there will be more peers
+	go func(cc *Client) {
+		defer cc.wg.Done()
+		err := cc.read(cc.peer)
+
+		// Tmp Implement
+		if err != nil {
+			p2pLog.Error("read error", zap.Error(err), zap.String("peer", cc.peer.Address))
+			return
+		}
+	}(c)
+
+	if c.peer.handshakeInfo != nil {
+		err := triggerHandshake(c.peer)
+		if err != nil {
+			return errors.Wrap(err, "connect and start: trigger handshake")
 		}
 	}
+
+	return nil
+}
+
+func (c *Client) Wait() {
+	c.wg.Wait()
 }

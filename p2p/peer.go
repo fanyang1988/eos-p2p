@@ -98,50 +98,44 @@ func (p *Peer) SetConnection(conn net.Conn) {
 	p.reader = bufio.NewReader(p.connection)
 }
 
-func (p *Peer) Connect(errChan chan error) (ready chan bool) {
+// Connect connect and start read go routine
+func (p *Peer) Connect() error {
 	nodeID := make([]byte, 32)
 	_, err := rand.Read(nodeID)
 	if err != nil {
-		errChan <- errors.Wrap(err, "generating random node id")
+		return errors.Wrap(err, "generating random node id")
 	}
 
 	p.NodeID = nodeID
 	hexNodeID := hex.EncodeToString(p.NodeID)
 	p.Name = fmt.Sprintf("Client Peer - %s", hexNodeID[0:8])
 
-	ready = make(chan bool, 1)
-	go func() {
-		address2log := zap.String("address", p.Address)
+	address2log := zap.String("address", p.Address)
 
-		if p.handshakeTimeout > 0 {
-			go func(p *Peer) {
-				select {
-				case <-time.After(p.handshakeTimeout):
-					p2pLog.Warn("handshake took too long", address2log)
-					errChan <- errors.Wrapf(err, "handshake took too long: %s", p.Address)
-				case <-p.cancelHandshakeTimeout:
-					p2pLog.Warn("cancelHandshakeTimeout canceled", address2log)
-				}
-			}(p)
-		}
-
-		p2pLog.Info("Dialing", address2log, zap.Duration("timeout", p.connectionTimeout))
-		conn, err := net.DialTimeout("tcp", p.Address, p.connectionTimeout)
-		if err != nil {
-			if p.handshakeTimeout > 0 {
-				p.cancelHandshakeTimeout <- true
+	if p.handshakeTimeout > 0 {
+		go func(p *Peer) {
+			select {
+			case <-time.After(p.handshakeTimeout):
+				p2pLog.Warn("handshake took too long", address2log)
+				p.Close(eos.GoAwayNoReason)
+			case <-p.cancelHandshakeTimeout:
+				p2pLog.Warn("cancelHandshakeTimeout canceled", address2log)
 			}
-			errChan <- errors.Wrapf(err, "peer init: dial %s", p.Address)
-			return
+		}(p)
+	}
+
+	p2pLog.Info("Dialing", address2log, zap.Duration("timeout", p.connectionTimeout))
+	conn, err := net.DialTimeout("tcp", p.Address, p.connectionTimeout)
+	if err != nil {
+		if p.handshakeTimeout > 0 {
+			p.cancelHandshakeTimeout <- true
 		}
-		p2pLog.Info("Connected to", address2log)
-		p.connection = conn
-		p.reader = bufio.NewReader(conn)
-		ready <- true
+		return errors.Wrapf(err, "peer init: dial %s", p.Address)
+	}
+	p2pLog.Info("Connected to", address2log)
+	p.SetConnection(conn)
 
-	}()
-
-	return
+	return nil
 }
 
 // Close send GoAway message then close connection

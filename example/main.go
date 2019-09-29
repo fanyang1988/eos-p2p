@@ -40,4 +40,6 @@ func main() {
 	client.RegisterHandler(p2p.StringLoggerHandler)
 	client.RegisterHandler(p2p.NewMsgHandler(&MsgHandler{}))
 	client.Start()
+
+	client.Wait()
 }
