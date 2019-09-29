@@ -130,6 +130,10 @@ func (c *Client) read(peer *Peer, errChannel chan error) {
 	}
 }
 
+func triggerHandshake(peer *Peer) error {
+	return peer.SendHandshake(peer.handshakeInfo)
+}
+
 func (c *Client) Start() error {
 	p2pLog.Info("Starting client")
 
