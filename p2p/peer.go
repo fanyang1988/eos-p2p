@@ -25,7 +25,6 @@ type Peer struct {
 	NodeID                 []byte
 	connection             net.Conn
 	reader                 io.Reader
-	listener               bool
 	handshakeInfo          *HandshakeInfo
 	connectionTimeout      time.Duration
 	handshakeTimeout       time.Duration
@@ -72,23 +71,14 @@ func (p *Peer) SetConnectionTimeout(timeout time.Duration) {
 	p.connectionTimeout = timeout
 }
 
-func newPeer(address string, agent string, listener bool, handshakeInfo *HandshakeInfo) *Peer {
-
+// NewOutgoingPeer peer
+func NewPeer(address string, agent string, handshakeInfo *HandshakeInfo) *Peer {
 	return &Peer{
 		Address:                address,
 		agent:                  agent,
-		listener:               listener,
 		handshakeInfo:          handshakeInfo,
 		cancelHandshakeTimeout: make(chan bool),
 	}
-}
-
-func NewIncommingPeer(address string, agent string) *Peer {
-	return newPeer(address, agent, true, nil)
-}
-
-func NewOutgoingPeer(address string, agent string, handshakeInfo *HandshakeInfo) *Peer {
-	return newPeer(address, agent, false, handshakeInfo)
 }
 
 func (p *Peer) Read() (*eos.Packet, error) {
@@ -109,7 +99,6 @@ func (p *Peer) SetConnection(conn net.Conn) {
 }
 
 func (p *Peer) Connect(errChan chan error) (ready chan bool) {
-
 	nodeID := make([]byte, 32)
 	_, err := rand.Read(nodeID)
 	if err != nil {
@@ -124,51 +113,32 @@ func (p *Peer) Connect(errChan chan error) (ready chan bool) {
 	go func() {
 		address2log := zap.String("address", p.Address)
 
-		if p.listener {
-			p2pLog.Debug("Listening on", address2log)
-
-			ln, err := net.Listen("tcp", p.Address)
-			if err != nil {
-				errChan <- errors.Wrapf(err, "peer init: listening %s", p.Address)
-			}
-
-			p2pLog.Debug("Accepting connection on", address2log)
-			conn, err := ln.Accept()
-			if err != nil {
-				errChan <- errors.Wrapf(err, "peer init: accepting connection on %s", p.Address)
-			}
-			p2pLog.Debug("Connected on", address2log)
-
-			p.SetConnection(conn)
-			ready <- true
-
-		} else {
-			if p.handshakeTimeout > 0 {
-				go func(p *Peer) {
-					select {
-					case <-time.After(p.handshakeTimeout):
-						p2pLog.Warn("handshake took too long", address2log)
-						errChan <- errors.Wrapf(err, "handshake took too long: %s", p.Address)
-					case <-p.cancelHandshakeTimeout:
-						p2pLog.Warn("cancelHandshakeTimeout canceled", address2log)
-					}
-				}(p)
-			}
-
-			p2pLog.Info("Dialing", address2log, zap.Duration("timeout", p.connectionTimeout))
-			conn, err := net.DialTimeout("tcp", p.Address, p.connectionTimeout)
-			if err != nil {
-				if p.handshakeTimeout > 0 {
-					p.cancelHandshakeTimeout <- true
+		if p.handshakeTimeout > 0 {
+			go func(p *Peer) {
+				select {
+				case <-time.After(p.handshakeTimeout):
+					p2pLog.Warn("handshake took too long", address2log)
+					errChan <- errors.Wrapf(err, "handshake took too long: %s", p.Address)
+				case <-p.cancelHandshakeTimeout:
+					p2pLog.Warn("cancelHandshakeTimeout canceled", address2log)
 				}
-				errChan <- errors.Wrapf(err, "peer init: dial %s", p.Address)
-				return
-			}
-			p2pLog.Info("Connected to", address2log)
-			p.connection = conn
-			p.reader = bufio.NewReader(conn)
-			ready <- true
+			}(p)
 		}
+
+		p2pLog.Info("Dialing", address2log, zap.Duration("timeout", p.connectionTimeout))
+		conn, err := net.DialTimeout("tcp", p.Address, p.connectionTimeout)
+		if err != nil {
+			if p.handshakeTimeout > 0 {
+				p.cancelHandshakeTimeout <- true
+			}
+			errChan <- errors.Wrapf(err, "peer init: dial %s", p.Address)
+			return
+		}
+		p2pLog.Info("Connected to", address2log)
+		p.connection = conn
+		p.reader = bufio.NewReader(conn)
+		ready <- true
+
 	}()
 
 	return

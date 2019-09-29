@@ -30,7 +30,7 @@ func main() {
 
 	Logger.Info("P2P Client ", zap.String("peer", *peer), zap.String("chainid", *chainID))
 	client := p2p.NewClient(
-		p2p.NewOutgoingPeer(*peer, "eos-proxy", &p2p.HandshakeInfo{
+		p2p.NewPeer(*peer, "eos-proxy", &p2p.HandshakeInfo{
 			ChainID:      cID,
 			HeadBlockNum: 1,
 		}),
