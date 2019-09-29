@@ -42,15 +42,14 @@ var StringLoggerHandler = HandlerFunc(func(envelope *Envelope) {
 
 // MsgHandler handler for each msg
 type MsgHandler interface {
-	OnHandshakeMsg(envelope *Envelope, msg *eos.HandshakeMessage)
-	//OnChainSizeMsg(envelope *Envelope, msg *eos.ChainSizeMessage)
-	OnGoAwayMsg(envelope *Envelope, msg *eos.GoAwayMessage)
-	OnTimeMsg(envelope *Envelope, msg *eos.TimeMessage)
-	OnNoticeMsg(envelope *Envelope, msg *eos.NoticeMessage)
-	OnRequestMsg(envelope *Envelope, msg *eos.RequestMessage)
-	OnSyncRequestMsg(envelope *Envelope, msg *eos.SyncRequestMessage)
-	OnSignedBlock(envelope *Envelope, msg *eos.SignedBlock)
-	OnPackedTransactionMsg(envelope *Envelope, msg *eos.PackedTransactionMessage)
+	OnHandshakeMsg(peer *Peer, msg *eos.HandshakeMessage)
+	OnGoAwayMsg(peer *Peer, msg *eos.GoAwayMessage)
+	OnTimeMsg(peer *Peer, msg *eos.TimeMessage)
+	OnNoticeMsg(peer *Peer, msg *eos.NoticeMessage)
+	OnRequestMsg(peer *Peer, msg *eos.RequestMessage)
+	OnSyncRequestMsg(peer *Peer, msg *eos.SyncRequestMessage)
+	OnSignedBlock(peer *Peer, msg *eos.SignedBlock)
+	OnPackedTransactionMsg(peer *Peer, msg *eos.PackedTransactionMessage)
 }
 
 // MsgHandlerImp MsgHandler for p2p msg
@@ -71,48 +70,43 @@ func (m MsgHandlerImp) Handle(envelope *Envelope) {
 	case *eos.HandshakeMessage:
 		handshakeMessage, ok := envelope.Packet.P2PMessage.(*eos.HandshakeMessage)
 		if ok && handshakeMessage != nil {
-			m.handler.OnHandshakeMsg(envelope, handshakeMessage)
+			m.handler.OnHandshakeMsg(envelope.Sender, handshakeMessage)
 		}
-	// Now EOS has not use this msg
-	//case *eos.ChainSizeMessage:
-	//	chainSizeMessage, ok := envelope.Packet.P2PMessage.(*eos.ChainSizeMessage)
-	//	if ok && chainSizeMessage != nil {
-	//		m.handler.OnChainSizeMsg(envelope, chainSizeMessage)
-	//	}
+	// Now EOS has not use *eos.ChainSizeMessage
 	case *eos.GoAwayMessage:
 		goAwayMsg, ok := envelope.Packet.P2PMessage.(*eos.GoAwayMessage)
 		if ok && goAwayMsg != nil {
-			m.handler.OnGoAwayMsg(envelope, goAwayMsg)
+			m.handler.OnGoAwayMsg(envelope.Sender, goAwayMsg)
 		}
 	case *eos.TimeMessage:
 		timeMessage, ok := envelope.Packet.P2PMessage.(*eos.TimeMessage)
 		if ok && timeMessage != nil {
-			m.handler.OnTimeMsg(envelope, timeMessage)
+			m.handler.OnTimeMsg(envelope.Sender, timeMessage)
 		}
 	case *eos.NoticeMessage:
 		noticeMessage, ok := envelope.Packet.P2PMessage.(*eos.NoticeMessage)
 		if ok && noticeMessage != nil {
-			m.handler.OnNoticeMsg(envelope, noticeMessage)
+			m.handler.OnNoticeMsg(envelope.Sender, noticeMessage)
 		}
 	case *eos.RequestMessage:
 		requestMessage, ok := envelope.Packet.P2PMessage.(*eos.RequestMessage)
 		if ok && requestMessage != nil {
-			m.handler.OnRequestMsg(envelope, requestMessage)
+			m.handler.OnRequestMsg(envelope.Sender, requestMessage)
 		}
 	case *eos.SyncRequestMessage:
 		syncRequestMessage, ok := envelope.Packet.P2PMessage.(*eos.SyncRequestMessage)
 		if ok && syncRequestMessage != nil {
-			m.handler.OnSyncRequestMsg(envelope, syncRequestMessage)
+			m.handler.OnSyncRequestMsg(envelope.Sender, syncRequestMessage)
 		}
 	case *eos.SignedBlock:
 		signedBlock, ok := envelope.Packet.P2PMessage.(*eos.SignedBlock)
 		if ok && signedBlock != nil {
-			m.handler.OnSignedBlock(envelope, signedBlock)
+			m.handler.OnSignedBlock(envelope.Sender, signedBlock)
 		}
 	case *eos.PackedTransactionMessage:
 		packedTransactionMessage, ok := envelope.Packet.P2PMessage.(*eos.PackedTransactionMessage)
 		if ok && packedTransactionMessage != nil {
-			m.handler.OnPackedTransactionMsg(envelope, packedTransactionMessage)
+			m.handler.OnPackedTransactionMsg(envelope.Sender, packedTransactionMessage)
 		}
 	default:
 	}

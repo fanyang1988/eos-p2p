@@ -12,41 +12,41 @@ type MsgHandler struct {
 }
 
 // OnHandshakeMsg handler func imp
-func (m *MsgHandler) OnHandshakeMsg(envelope *p2p.Envelope, msg *eos.HandshakeMessage) {
+func (m *MsgHandler) OnHandshakeMsg(peer *p2p.Peer, msg *eos.HandshakeMessage) {
 	Logger.Info("on handshake", zap.Int16("generation", msg.Generation))
 }
 
 // OnGoAwayMsg handler func imp
-func (m *MsgHandler) OnGoAwayMsg(envelope *p2p.Envelope, msg *eos.GoAwayMessage) {
+func (m *MsgHandler) OnGoAwayMsg(peer *p2p.Peer, msg *eos.GoAwayMessage) {
 
 }
 
 // OnTimeMsg handler func imp
-func (m *MsgHandler) OnTimeMsg(envelope *p2p.Envelope, msg *eos.TimeMessage) {
+func (m *MsgHandler) OnTimeMsg(peer *p2p.Peer, msg *eos.TimeMessage) {
 
 }
 
 // OnNoticeMsg handler func imp
-func (m *MsgHandler) OnNoticeMsg(envelope *p2p.Envelope, msg *eos.NoticeMessage) {
+func (m *MsgHandler) OnNoticeMsg(peer *p2p.Peer, msg *eos.NoticeMessage) {
 
 }
 
 // OnRequestMsg handler func imp
-func (m *MsgHandler) OnRequestMsg(envelope *p2p.Envelope, msg *eos.RequestMessage) {
+func (m *MsgHandler) OnRequestMsg(peer *p2p.Peer, msg *eos.RequestMessage) {
 
 }
 
 // OnSyncRequestMsg handler func imp
-func (m *MsgHandler) OnSyncRequestMsg(envelope *p2p.Envelope, msg *eos.SyncRequestMessage) {
+func (m *MsgHandler) OnSyncRequestMsg(peer *p2p.Peer, msg *eos.SyncRequestMessage) {
 
 }
 
 // OnSignedBlock handler func imp
-func (m *MsgHandler) OnSignedBlock(envelope *p2p.Envelope, msg *eos.SignedBlock) {
+func (m *MsgHandler) OnSignedBlock(peer *p2p.Peer, msg *eos.SignedBlock) {
 
 }
 
 // OnPackedTransactionMsg handler func imp
-func (m *MsgHandler) OnPackedTransactionMsg(envelope *p2p.Envelope, msg *eos.PackedTransactionMessage) {
+func (m *MsgHandler) OnPackedTransactionMsg(peer *p2p.Peer, msg *eos.PackedTransactionMessage) {
 
 }

@@ -37,37 +37,37 @@ func (s *syncManager) sendSyncRequest(peer *Peer) error {
 }
 
 // OnHandshakeMsg handler func imp
-func (s *syncManager) OnHandshakeMsg(envelope *Envelope, msg *eos.HandshakeMessage) {
+func (s *syncManager) OnHandshakeMsg(peer *Peer, msg *eos.HandshakeMessage) {
 }
 
 // OnGoAwayMsg handler func imp
-func (s *syncManager) OnGoAwayMsg(envelope *Envelope, msg *eos.GoAwayMessage) {
+func (s *syncManager) OnGoAwayMsg(peer *Peer, msg *eos.GoAwayMessage) {
 }
 
 // OnTimeMsg handler func imp
-func (s *syncManager) OnTimeMsg(envelope *Envelope, msg *eos.TimeMessage) {
+func (s *syncManager) OnTimeMsg(peer *Peer, msg *eos.TimeMessage) {
 }
 
 // OnNoticeMsg handler func imp
-func (s *syncManager) OnNoticeMsg(envelope *Envelope, msg *eos.NoticeMessage) {
+func (s *syncManager) OnNoticeMsg(peer *Peer, msg *eos.NoticeMessage) {
 }
 
 // OnRequestMsg handler func imp
-func (s *syncManager) OnRequestMsg(envelope *Envelope, msg *eos.RequestMessage) {
+func (s *syncManager) OnRequestMsg(peer *Peer, msg *eos.RequestMessage) {
 
 }
 
 // OnSyncRequestMsg handler func imp
-func (s *syncManager) OnSyncRequestMsg(envelope *Envelope, msg *eos.SyncRequestMessage) {
+func (s *syncManager) OnSyncRequestMsg(peer *Peer, msg *eos.SyncRequestMessage) {
 
 }
 
 // OnSignedBlock handler func imp
-func (s *syncManager) OnSignedBlock(envelope *Envelope, msg *eos.SignedBlock) {
+func (s *syncManager) OnSignedBlock(peer *Peer, msg *eos.SignedBlock) {
 
 }
 
 // OnPackedTransactionMsg handler func imp
-func (s *syncManager) OnPackedTransactionMsg(envelope *Envelope, msg *eos.PackedTransactionMessage) {
+func (s *syncManager) OnPackedTransactionMsg(peer *Peer, msg *eos.PackedTransactionMessage) {
 
 }
