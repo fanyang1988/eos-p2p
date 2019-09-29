@@ -9,9 +9,9 @@ import (
 	"github.com/fanyang1988/eos-p2p/p2p"
 )
 
-var peer = flag.String("peer", "localhost:9876", "peer to connect to")
-var chainID = flag.String("chain-id", "cf057bbfb72640471fd910bcb67639c22df9f92470936cddc1ade0e2f2e7dc4f", "net chainID to connect to")
-var showLog = flag.Bool("v", false, "show detail log")
+var peer = flag.String("peer", "localhost:9001", "peer to connect to")
+var chainID = flag.String("chain-id", "1c6ae7719a2a3b4ecb19584a30ff510ba1b6ded86e1fd8b8fc22f1179c622a32", "net chainID to connect to")
+var showLog = flag.Bool("v", true, "show detail log")
 
 func main() {
 	flag.Parse()
@@ -32,9 +32,10 @@ func main() {
 			ChainID:      cID,
 			HeadBlockNum: 1,
 		}),
-		false,
+		true,
 	)
 
 	client.RegisterHandler(p2p.StringLoggerHandler)
+	client.RegisterHandler(p2p.NewMsgHandler(&MsgHandler{}))
 	client.Start()
 }
