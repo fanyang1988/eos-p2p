@@ -23,6 +23,7 @@ func NewClient(peer *Peer, needSync bool) *Client {
 		client.sync = &syncManager{
 			headBlock: peer.handshakeInfo.HeadBlockNum,
 		}
+		client.RegisterHandler(NewMsgHandler(client.sync))
 	}
 	return client
 }
@@ -39,7 +40,6 @@ func (c *Client) SetReadTimeout(readTimeout time.Duration) {
 }
 
 func (c *Client) RegisterHandler(handler Handler) {
-
 	c.handlers = append(c.handlers, handler)
 }
 

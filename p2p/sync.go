@@ -3,6 +3,7 @@ package p2p
 import (
 	"math"
 
+	"github.com/eoscanada/eos-go"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -16,7 +17,6 @@ type syncManager struct {
 }
 
 func (s *syncManager) sendSyncRequest(peer *Peer) error {
-
 	s.IsCatchingUp = true
 
 	delta := s.originHeadBlock - s.headBlock
@@ -34,4 +34,40 @@ func (s *syncManager) sendSyncRequest(peer *Peer) error {
 	}
 
 	return nil
+}
+
+// OnHandshakeMsg handler func imp
+func (s *syncManager) OnHandshakeMsg(envelope *Envelope, msg *eos.HandshakeMessage) {
+}
+
+// OnGoAwayMsg handler func imp
+func (s *syncManager) OnGoAwayMsg(envelope *Envelope, msg *eos.GoAwayMessage) {
+}
+
+// OnTimeMsg handler func imp
+func (s *syncManager) OnTimeMsg(envelope *Envelope, msg *eos.TimeMessage) {
+}
+
+// OnNoticeMsg handler func imp
+func (s *syncManager) OnNoticeMsg(envelope *Envelope, msg *eos.NoticeMessage) {
+}
+
+// OnRequestMsg handler func imp
+func (s *syncManager) OnRequestMsg(envelope *Envelope, msg *eos.RequestMessage) {
+
+}
+
+// OnSyncRequestMsg handler func imp
+func (s *syncManager) OnSyncRequestMsg(envelope *Envelope, msg *eos.SyncRequestMessage) {
+
+}
+
+// OnSignedBlock handler func imp
+func (s *syncManager) OnSignedBlock(envelope *Envelope, msg *eos.SignedBlock) {
+
+}
+
+// OnPackedTransactionMsg handler func imp
+func (s *syncManager) OnPackedTransactionMsg(envelope *Envelope, msg *eos.PackedTransactionMessage) {
+
 }
