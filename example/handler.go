@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/eoscanada/eos-go"
 	"github.com/fanyang1988/eos-p2p/p2p"
+	"go.uber.org/zap"
 )
 
 // MsgHandler p2p.MsgHandler imp
@@ -11,7 +12,7 @@ type MsgHandler struct {
 
 // OnHandshakeMsg handler func imp
 func (m *MsgHandler) OnHandshakeMsg(envelope *p2p.Envelope, msg *eos.HandshakeMessage) {
-
+	Logger.Info("on handshake", zap.Int16("generation", msg.Generation))
 }
 
 // OnGoAwayMsg handler func imp

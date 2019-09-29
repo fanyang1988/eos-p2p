@@ -18,6 +18,11 @@ func EnableP2PLogging() {
 	p2pLog = eos.NewLogger(false)
 }
 
+// SetLogger set logger for p2p mode
+func SetLogger(l *zap.Logger) {
+	p2pLog = l
+}
+
 // logErr log err msg by p2pLog
 func logErr(msg string, err error) {
 	p2pLog.Error(msg, zap.Error(err))

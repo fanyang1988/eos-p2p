@@ -3,10 +3,10 @@ package main
 import (
 	"encoding/hex"
 	"flag"
-	"fmt"
 	"log"
 
 	"github.com/fanyang1988/eos-p2p/p2p"
+	"go.uber.org/zap"
 )
 
 var peer = flag.String("peer", "localhost:9001", "peer to connect to")
@@ -17,22 +17,23 @@ func main() {
 	flag.Parse()
 
 	if *showLog {
-		p2p.EnableP2PLogging()
+		EnableLogging()
+		p2p.SetLogger(Logger)
 	}
-	defer p2p.SyncLogger()
+	defer Logger.Sync()
 
 	cID, err := hex.DecodeString(*chainID)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("P2P Client ", *peer, " With Chain ID :", *chainID)
+	Logger.Info("P2P Client ", zap.String("peer", *peer), zap.String("chainid", *chainID))
 	client := p2p.NewClient(
 		p2p.NewOutgoingPeer(*peer, "eos-proxy", &p2p.HandshakeInfo{
 			ChainID:      cID,
 			HeadBlockNum: 1,
 		}),
-		true,
+		false,
 	)
 
 	client.RegisterHandler(p2p.StringLoggerHandler)
