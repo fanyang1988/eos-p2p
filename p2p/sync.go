@@ -95,12 +95,12 @@ func (s *syncManager) OnNoticeMsg(peer *Peer, msg *eos.NoticeMessage) {
 
 // OnRequestMsg handler func imp
 func (s *syncManager) OnRequestMsg(peer *Peer, msg *eos.RequestMessage) {
-
+	// TODO: can sync to others
 }
 
 // OnSyncRequestMsg handler func imp
 func (s *syncManager) OnSyncRequestMsg(peer *Peer, msg *eos.SyncRequestMessage) {
-
+	// TODO: can sync to others
 }
 
 // OnSignedBlock handler func imp
@@ -108,36 +108,47 @@ func (s *syncManager) OnSignedBlock(peer *Peer, msg *eos.SignedBlock) {
 	if s.IsSyncAll {
 		blockNum := msg.BlockNumber()
 		s.headBlock = blockNum
-		if s.requestedEndBlock == blockNum {
-			if s.originHeadBlock <= blockNum {
-				p2pLog.Debug("In sync with last handshake")
-				blockID, err := msg.BlockID()
-				if err != nil {
-					//errChannel <- errors.Wrap(err, "getting block id")
-					peer.Close(eos.GoAwayValidation)
-					return
-				}
-				peer.handshakeInfo.HeadBlockNum = blockNum
-				peer.handshakeInfo.HeadBlockID = blockID
-				peer.handshakeInfo.HeadBlockTime = msg.SignedBlockHeader.Timestamp.Time
-				err = peer.SendHandshake(peer.handshakeInfo)
-				if err != nil {
-					//errChannel <- errors.Wrap(err, "send handshake")
-					peer.ClosePeer()
-				}
-				p2pLog.Debug("Send new handshake", zap.Object("handshakeInfo", peer.handshakeInfo))
-			} else {
-				err := s.sendSyncRequest(peer)
-				if err != nil {
-					//errChannel <- errors.Wrap(err, "signed block: sending sync request")
-					peer.ClosePeer()
-				}
+
+		if s.requestedEndBlock != blockNum {
+			// need to get more blocks
+			return
+		}
+
+		if s.originHeadBlock <= blockNum {
+			// now block have got all
+			p2pLog.Debug("In sync with last handshake")
+			blockID, err := msg.BlockID()
+			if err != nil {
+				//errChannel <- errors.Wrap(err, "getting block id")
+				peer.Close(eos.GoAwayValidation)
+				return
 			}
+			peer.handshakeInfo.HeadBlockNum = blockNum
+			peer.handshakeInfo.HeadBlockID = blockID
+			peer.handshakeInfo.HeadBlockTime = msg.SignedBlockHeader.Timestamp.Time
+
+			p2pLog.Debug("have sync all blocks needed",
+				zap.Uint32("to", blockNum))
+
+			err = peer.SendHandshake(peer.handshakeInfo)
+			if err != nil {
+				//errChannel <- errors.Wrap(err, "send handshake")
+				peer.ClosePeer()
+			}
+			p2pLog.Debug("Send new handshake", zap.Object("handshakeInfo", peer.handshakeInfo))
+		} else {
+			// need get next blocks by sync
+			err := s.sendSyncRequest(peer)
+			if err != nil {
+				//errChannel <- errors.Wrap(err, "signed block: sending sync request")
+				peer.ClosePeer()
+			}
+
 		}
 	}
 }
 
 // OnPackedTransactionMsg handler func imp
 func (s *syncManager) OnPackedTransactionMsg(peer *Peer, msg *eos.PackedTransactionMessage) {
-
+	// do nothing
 }
