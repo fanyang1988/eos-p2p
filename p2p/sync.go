@@ -8,6 +8,11 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	// BlockNumPerRequest the number of block in a request when sync
+	BlockNumPerRequest uint32 = 50
+)
+
 type syncManager struct {
 	IsSyncAll           bool
 	IsCatchingUp        bool
@@ -23,7 +28,7 @@ func (s *syncManager) sendSyncRequest(peer *Peer) error {
 	delta := s.originHeadBlock - s.headBlock
 
 	s.requestedStartBlock = s.headBlock
-	s.requestedEndBlock = s.headBlock + uint32(math.Min(float64(delta), 100))
+	s.requestedEndBlock = s.headBlock + uint32(math.Min(float64(delta), float64(BlockNumPerRequest)))
 
 	p2pLog.Debug("Sending sync request",
 		zap.Uint32("startBlock", s.requestedStartBlock),

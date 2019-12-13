@@ -34,7 +34,7 @@ func main() {
 			ChainID:      cID,
 			HeadBlockNum: 1,
 		}),
-		false,
+		true,
 	)
 
 	client.RegisterHandler(p2p.StringLoggerHandler)

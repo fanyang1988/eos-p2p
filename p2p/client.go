@@ -8,6 +8,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO: use mutiply p2p peers
+
+// Client a p2p Client for eos chain
 type Client struct {
 	peer        *Peer
 	handlers    []Handler
@@ -17,12 +20,13 @@ type Client struct {
 	wg sync.WaitGroup
 }
 
+// NewClient create a p2p client
 func NewClient(peer *Peer, needSync bool) *Client {
 	client := &Client{
 		peer: peer,
 		sync: &syncManager{
 			IsSyncAll: needSync,
-			headBlock: peer.handshakeInfo.HeadBlockNum,
+			headBlock: peer.handshakeInfo.HeadBlockNum, // TODO use local store for blocks had got
 		},
 	}
 	client.RegisterHandler(NewMsgHandler(client.sync))
