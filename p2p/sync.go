@@ -73,6 +73,9 @@ func (s *syncManager) OnGoAwayMsg(peer *Peer, msg *eos.GoAwayMessage) {
 
 // OnTimeMsg handler func imp
 func (s *syncManager) OnTimeMsg(peer *Peer, msg *eos.TimeMessage) {
+	if err := peer.SendTime(); err != nil {
+		p2pLog.Warn("send time msg to peer err", zap.Error(err))
+	}
 }
 
 // OnNoticeMsg handler func imp
