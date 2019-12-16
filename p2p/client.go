@@ -33,17 +33,20 @@ func NewClient(peer *Peer, needSync bool) *Client {
 	return client
 }
 
-func (c *Client) CloseConnection() error {
+// Close close client
+func (c *Client) Close() error {
 	if c.peer.connection == nil {
 		return nil
 	}
 	return c.peer.connection.Close()
 }
 
+// SetReadTimeout set conn io readtimeout
 func (c *Client) SetReadTimeout(readTimeout time.Duration) {
 	c.readTimeout = readTimeout
 }
 
+// RegisterHandler reg handler to client
 func (c *Client) RegisterHandler(handler Handler) {
 	c.handlers = append(c.handlers, handler)
 }
@@ -66,6 +69,7 @@ func triggerHandshake(peer *Peer) error {
 	return peer.SendHandshake(peer.handshakeInfo)
 }
 
+// Start start client process gorountinue
 func (c *Client) Start() error {
 	p2pLog.Info("Starting client")
 
@@ -98,6 +102,7 @@ func (c *Client) Start() error {
 	return nil
 }
 
+// Wait wait client closed
 func (c *Client) Wait() {
 	c.wg.Wait()
 }
