@@ -35,7 +35,6 @@ var StringLoggerHandler = HandlerFunc(func(envelope *Envelope) {
 		"handler Packet",
 		zap.String("name", name),
 		zap.String("sender", envelope.Sender.Address),
-		zap.String("receiver", envelope.Receiver.Address),
 		zap.Stringer("msg", envelope.Packet.P2PMessage), // this will use by String()
 	)
 })

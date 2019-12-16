@@ -55,7 +55,7 @@ func (c *Client) read(peer *Peer) error {
 			return errors.Wrapf(err, "read message from %s", peer.Address)
 		}
 
-		envelope := NewEnvelope(peer, peer, packet)
+		envelope := newEnvelope(peer, packet)
 		for _, handle := range c.handlers {
 			handle.Handle(envelope)
 		}
