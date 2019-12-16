@@ -107,7 +107,7 @@ func (c *Client) RegisterHandler(handler Handler) {
 	c.handlers = append(c.handlers, handler)
 }
 
-func (c *Client) read(peer *Peer) error {
+func (c *Client) peerLoop(peer *Peer) error {
 	for {
 		packet, err := peer.Read()
 		if err != nil {
@@ -129,17 +129,16 @@ func triggerHandshake(peer *Peer) error {
 func (c *Client) Start(ctx context.Context) error {
 	p2pLog.Info("Starting client")
 
-	err := c.peer.Connect()
+	err := c.peer.Start(ctx)
 	if err != nil {
 		return errors.Wrap(err, "connect error")
 	}
 
-	c.wg.Add(1)
-
 	// FIXME: there will be more peers
+	c.wg.Add(1)
 	go func(cc *Client) {
 		defer cc.wg.Done()
-		err := cc.read(cc.peer)
+		err := cc.peerLoop(cc.peer)
 
 		// Tmp Implement
 		if err != nil {

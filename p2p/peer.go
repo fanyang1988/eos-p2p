@@ -2,13 +2,12 @@ package p2p
 
 import (
 	"bufio"
-	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
-	"runtime"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,15 +33,6 @@ type Peer struct {
 type PeerCfg struct {
 	Name    string `json:"name"`
 	Address string `json:"addr"`
-}
-
-// GetName get peer name
-func (p PeerCfg) GetName() string {
-	if p.Name == "" {
-		return fmt.Sprintf("peer-cli-%s", p.Address)
-	}
-
-	return p.Name
 }
 
 // MarshalLogObject calls the underlying function from zap.
@@ -86,9 +76,23 @@ func NewPeer(cfg *PeerCfg, headBlockNum uint32, chainID string) (*Peer, error) {
 		return nil, errors.Wrapf(err, "decode chainID error")
 	}
 
+	nodeID := make([]byte, 32)
+	_, err = rand.Read(nodeID)
+	if err != nil {
+		return nil, errors.Wrap(err, "generating random node id error")
+	}
+
+	name := cfg.Name
+
+	if name == "" {
+		hexNodeID := hex.EncodeToString(nodeID)
+		name = fmt.Sprintf("ClientPeer-%s", hexNodeID[0:8])
+	}
+
 	res := &Peer{
+		NodeID:  nodeID,
 		Address: cfg.Address,
-		agent:   cfg.GetName(),
+		agent:   name,
 		handshakeInfo: &HandshakeInfo{
 			ChainID:      cID,
 			HeadBlockNum: headBlockNum,
@@ -121,23 +125,20 @@ func (p *Peer) Read() (*Packet, error) {
 	return packet, nil
 }
 
-func (p *Peer) setConnection(conn net.Conn) {
-	p.connection = conn
-	p.reader = bufio.NewReader(p.connection)
-}
-
-// Connect connect and start read go routine
-func (p *Peer) Connect() error {
-	nodeID := make([]byte, 32)
-	_, err := rand.Read(nodeID)
+func (p *Peer) connect() error {
+	conn, err := net.DialTimeout("tcp", p.Address, p.connectionTimeout)
 	if err != nil {
-		return errors.Wrap(err, "generating random node id")
+		return errors.Wrapf(err, "peer connect error %s", p.Address)
 	}
 
-	p.NodeID = nodeID
-	hexNodeID := hex.EncodeToString(p.NodeID)
-	p.Name = fmt.Sprintf("Client Peer - %s", hexNodeID[0:8])
+	p.connection = conn
+	p.reader = bufio.NewReader(p.connection)
 
+	return nil
+}
+
+// Start connect and start read go routine
+func (p *Peer) Start(ctx context.Context) error {
 	address2log := zap.String("address", p.Address)
 
 	if p.handshakeTimeout > 0 {
@@ -153,15 +154,13 @@ func (p *Peer) Connect() error {
 	}
 
 	p2pLog.Info("Dialing", address2log, zap.Duration("timeout", p.connectionTimeout))
-	conn, err := net.DialTimeout("tcp", p.Address, p.connectionTimeout)
+	err := p.connect()
 	if err != nil {
 		if p.handshakeTimeout > 0 {
 			p.cancelHandshakeTimeout <- true
 		}
-		return errors.Wrapf(err, "peer init: dial %s", p.Address)
+		return err
 	}
-	p2pLog.Info("Connected to", address2log)
-	p.setConnection(conn)
 
 	return nil
 }
@@ -176,151 +175,6 @@ func (p *Peer) Close(reason GoAwayReason) error {
 func (p *Peer) ClosePeer() error {
 	if p.connection != nil {
 		return p.connection.Close()
-	}
-
-	return nil
-}
-
-func (p *Peer) Write(bytes []byte) (int, error) {
-	return p.connection.Write(bytes)
-}
-
-// WriteP2PMessage wrrite a p2p msg to peer
-func (p *Peer) WriteP2PMessage(message Message) (err error) {
-	packet := &Packet{
-		Type:       message.GetType(),
-		P2PMessage: message,
-	}
-
-	buff := bytes.NewBuffer(make([]byte, 0, 512))
-
-	encoder := newEOSEncoder(buff)
-	err = encoder.Encode(packet)
-	if err != nil {
-		return errors.Wrapf(err, "unable to encode message %s", message)
-	}
-
-	_, err = p.Write(buff.Bytes())
-	if err != nil {
-		return errors.Wrapf(err, "write msg to %s", p.Address)
-	}
-
-	return nil
-}
-
-// SendGoAway send go away message to peer
-func (p *Peer) SendGoAway(reason GoAwayReason) error {
-	p2pLog.Debug("SendGoAway", zap.String("reson", reason.String()))
-
-	return errors.WithStack(p.WriteP2PMessage(&GoAwayMessage{
-		Reason: reason,
-		NodeID: p.NodeID,
-	}))
-}
-
-// SendSyncRequest send a sync req
-func (p *Peer) SendSyncRequest(startBlockNum uint32, endBlockNumber uint32) (err error) {
-	p2pLog.Debug("SendSyncRequest",
-		zap.String("peer", p.Address),
-		zap.Uint32("start", startBlockNum),
-		zap.Uint32("end", endBlockNumber))
-
-	syncRequest := &SyncRequestMessage{
-		StartBlock: startBlockNum,
-		EndBlock:   endBlockNumber,
-	}
-
-	return errors.WithStack(p.WriteP2PMessage(syncRequest))
-}
-
-// SendRequest send req msg for p2p
-func (p *Peer) SendRequest(startBlockNum uint32, endBlockNumber uint32) (err error) {
-	p2pLog.Debug("SendRequest",
-		zap.String("peer", p.Address),
-		zap.Uint32("start", startBlockNum),
-		zap.Uint32("end", endBlockNumber))
-
-	request := &RequestMessage{
-		ReqTrx: OrderedBlockIDs{
-			Mode:    [4]byte{0, 0, 0, 0},
-			Pending: startBlockNum,
-		},
-		ReqBlocks: OrderedBlockIDs{
-			Mode:    [4]byte{0, 0, 0, 0},
-			Pending: endBlockNumber,
-		},
-	}
-
-	return errors.WithStack(p.WriteP2PMessage(request))
-}
-
-// SendNotice send notice msg for p2p
-func (p *Peer) SendNotice(headBlockNum uint32, libNum uint32, mode byte) error {
-	p2pLog.Debug("Send Notice",
-		zap.String("peer", p.Address),
-		zap.Uint32("head", headBlockNum),
-		zap.Uint32("lib", libNum),
-		zap.Uint8("type", mode))
-
-	notice := &NoticeMessage{
-		KnownTrx: OrderedBlockIDs{
-			Mode:    [4]byte{mode, 0, 0, 0},
-			Pending: headBlockNum,
-		},
-		KnownBlocks: OrderedBlockIDs{
-			Mode:    [4]byte{mode, 0, 0, 0},
-			Pending: libNum,
-		},
-	}
-	return errors.WithStack(p.WriteP2PMessage(notice))
-}
-
-// SendTime send time sync msg to peer
-func (p *Peer) SendTime() error {
-	p2pLog.Debug("SendTime", zap.String("peer", p.Address))
-
-	notice := &TimeMessage{}
-	return errors.WithStack(p.WriteP2PMessage(notice))
-}
-
-// SendHandshake send handshake msg to peer
-func (p *Peer) SendHandshake(info *HandshakeInfo) error {
-
-	publicKey, err := newPublicKey("EOS1111111111111111111111111111111114T1Anm")
-	if err != nil {
-		return errors.Wrapf(err, "sending handshake to %s: create public key", p.Address)
-	}
-
-	p2pLog.Debug("SendHandshake", zap.String("peer", p.Address), zap.Object("info", info))
-
-	tstamp := Tstamp{Time: info.HeadBlockTime}
-
-	signature := Signature{
-		Curve:   CurveK1,
-		Content: make([]byte, 65, 65),
-	}
-
-	handshake := &HandshakeMessage{
-		NetworkVersion:           1206,
-		ChainID:                  info.ChainID,
-		NodeID:                   p.NodeID,
-		Key:                      publicKey,
-		Time:                     tstamp,
-		Token:                    make([]byte, 32, 32),
-		Signature:                signature,
-		P2PAddress:               p.Name,
-		LastIrreversibleBlockNum: info.LastIrreversibleBlockNum,
-		LastIrreversibleBlockID:  info.LastIrreversibleBlockID,
-		HeadNum:                  info.HeadBlockNum,
-		HeadID:                   info.HeadBlockID,
-		OS:                       runtime.GOOS,
-		Agent:                    p.agent,
-		Generation:               int16(1),
-	}
-
-	err = p.WriteP2PMessage(handshake)
-	if err != nil {
-		err = errors.Wrapf(err, "sending handshake to %s", p.Address)
 	}
 
 	return nil
