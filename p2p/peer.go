@@ -18,6 +18,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// Peer a p2p peer to other
 type Peer struct {
 	Address                string
 	Name                   string
@@ -39,6 +40,7 @@ func (p Peer) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return enc.AddObject("handshakeInfo", p.handshakeInfo)
 }
 
+// HandshakeInfo handshake state for peer
 type HandshakeInfo struct {
 	ChainID                  eos.Checksum256
 	HeadBlockNum             uint32
@@ -49,7 +51,8 @@ type HandshakeInfo struct {
 }
 
 func (h *HandshakeInfo) String() string {
-	return fmt.Sprintf("Handshake Info: HeadBlockNum [%d], LastIrreversibleBlockNum [%d]", h.HeadBlockNum, h.LastIrreversibleBlockNum)
+	return fmt.Sprintf("Handshake Info: Head[%d], LastIrreversible[%d]",
+		h.HeadBlockNum, h.LastIrreversibleBlockNum)
 }
 
 // MarshalLogObject calls the underlying function from zap.
@@ -63,15 +66,17 @@ func (h HandshakeInfo) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
+// SetHandshakeTimeout set send handshake timeout
 func (p *Peer) SetHandshakeTimeout(timeout time.Duration) {
 	p.handshakeTimeout = timeout
 }
 
+// SetConnectionTimeout for net DialTimeout
 func (p *Peer) SetConnectionTimeout(timeout time.Duration) {
 	p.connectionTimeout = timeout
 }
 
-// NewOutgoingPeer peer
+// NewPeer create a peer
 func NewPeer(address string, agent string, handshakeInfo *HandshakeInfo) *Peer {
 	return &Peer{
 		Address:                address,
@@ -93,7 +98,7 @@ func (p *Peer) Read() (*eos.Packet, error) {
 	return packet, nil
 }
 
-func (p *Peer) SetConnection(conn net.Conn) {
+func (p *Peer) setConnection(conn net.Conn) {
 	p.connection = conn
 	p.reader = bufio.NewReader(p.connection)
 }
@@ -133,7 +138,7 @@ func (p *Peer) Connect() error {
 		return errors.Wrapf(err, "peer init: dial %s", p.Address)
 	}
 	p2pLog.Info("Connected to", address2log)
-	p.SetConnection(conn)
+	p.setConnection(conn)
 
 	return nil
 }
@@ -154,12 +159,11 @@ func (p *Peer) ClosePeer() error {
 }
 
 func (p *Peer) Write(bytes []byte) (int, error) {
-
 	return p.connection.Write(bytes)
 }
 
+// WriteP2PMessage wrrite a p2p msg to peer
 func (p *Peer) WriteP2PMessage(message eos.P2PMessage) (err error) {
-
 	packet := &eos.Packet{
 		Type:       message.GetType(),
 		P2PMessage: message,
@@ -191,6 +195,7 @@ func (p *Peer) SendGoAway(reason eos.GoAwayReason) error {
 	}))
 }
 
+// SendSyncRequest send a sync req
 func (p *Peer) SendSyncRequest(startBlockNum uint32, endBlockNumber uint32) (err error) {
 	p2pLog.Debug("SendSyncRequest",
 		zap.String("peer", p.Address),
@@ -204,6 +209,8 @@ func (p *Peer) SendSyncRequest(startBlockNum uint32, endBlockNumber uint32) (err
 
 	return errors.WithStack(p.WriteP2PMessage(syncRequest))
 }
+
+// SendRequest send req msg for p2p
 func (p *Peer) SendRequest(startBlockNum uint32, endBlockNumber uint32) (err error) {
 	p2pLog.Debug("SendRequest",
 		zap.String("peer", p.Address),
@@ -224,6 +231,7 @@ func (p *Peer) SendRequest(startBlockNum uint32, endBlockNumber uint32) (err err
 	return errors.WithStack(p.WriteP2PMessage(request))
 }
 
+// SendNotice send notice msg for p2p
 func (p *Peer) SendNotice(headBlockNum uint32, libNum uint32, mode byte) error {
 	p2pLog.Debug("Send Notice",
 		zap.String("peer", p.Address),
@@ -244,6 +252,7 @@ func (p *Peer) SendNotice(headBlockNum uint32, libNum uint32, mode byte) error {
 	return errors.WithStack(p.WriteP2PMessage(notice))
 }
 
+// SendTime send time sync msg to peer
 func (p *Peer) SendTime() error {
 	p2pLog.Debug("SendTime", zap.String("peer", p.Address))
 
@@ -251,6 +260,7 @@ func (p *Peer) SendTime() error {
 	return errors.WithStack(p.WriteP2PMessage(notice))
 }
 
+// SendHandshake send handshake msg to peer
 func (p *Peer) SendHandshake(info *HandshakeInfo) error {
 
 	publicKey, err := ecc.NewPublicKey("EOS1111111111111111111111111111111114T1Anm")
