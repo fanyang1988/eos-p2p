@@ -85,7 +85,7 @@ func NewPeer(address string, agent string, handshakeInfo *HandshakeInfo) *Peer {
 }
 
 func (p *Peer) Read() (*Packet, error) {
-	packet, err := ReadPacket(p.reader)
+	packet, err := readEOSPacket(p.reader)
 	if p.handshakeTimeout > 0 {
 		p.cancelHandshakeTimeout <- true
 	}
@@ -120,7 +120,7 @@ func (p *Peer) Connect() error {
 			select {
 			case <-time.After(p.handshakeTimeout):
 				p2pLog.Warn("handshake took too long", address2log)
-				p.Close(GoAwayNoReason)
+				p.Close(goAwayNoReason)
 			case <-p.cancelHandshakeTimeout:
 				p2pLog.Warn("cancelHandshakeTimeout canceled", address2log)
 			}
@@ -161,7 +161,7 @@ func (p *Peer) Write(bytes []byte) (int, error) {
 }
 
 // WriteP2PMessage wrrite a p2p msg to peer
-func (p *Peer) WriteP2PMessage(message P2PMessage) (err error) {
+func (p *Peer) WriteP2PMessage(message Message) (err error) {
 	packet := &Packet{
 		Type:       message.GetType(),
 		P2PMessage: message,
@@ -169,7 +169,7 @@ func (p *Peer) WriteP2PMessage(message P2PMessage) (err error) {
 
 	buff := bytes.NewBuffer(make([]byte, 0, 512))
 
-	encoder := NewEncoder(buff)
+	encoder := newEOSEncoder(buff)
 	err = encoder.Encode(packet)
 	if err != nil {
 		return errors.Wrapf(err, "unable to encode message %s", message)
@@ -261,7 +261,7 @@ func (p *Peer) SendTime() error {
 // SendHandshake send handshake msg to peer
 func (p *Peer) SendHandshake(info *HandshakeInfo) error {
 
-	publicKey, err := NewPublicKey("EOS1111111111111111111111111111111114T1Anm")
+	publicKey, err := newPublicKey("EOS1111111111111111111111111111111114T1Anm")
 	if err != nil {
 		return errors.Wrapf(err, "sending handshake to %s: create public key", p.Address)
 	}

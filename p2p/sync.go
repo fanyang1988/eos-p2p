@@ -56,7 +56,7 @@ func (s *syncManager) OnHandshakeMsg(peer *Peer, msg *HandshakeMessage) {
 		msg.P2PAddress = peer.Name
 		err := peer.WriteP2PMessage(msg)
 		if err != nil {
-			peer.Close(GoAwayNoReason)
+			peer.Close(goAwayNoReason)
 			return
 		}
 		p2pLog.Debug("Handshake resent", zap.String("other", msg.P2PAddress))
@@ -119,7 +119,7 @@ func (s *syncManager) OnSignedBlock(peer *Peer, msg *SignedBlock) {
 			blockID, err := msg.BlockID()
 			if err != nil {
 				//errChannel <- errors.Wrap(err, "getting block id")
-				peer.Close(GoAwayValidation)
+				peer.Close(goAwayValidation)
 				return
 			}
 			peer.handshakeInfo.HeadBlockNum = blockNum
