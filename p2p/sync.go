@@ -3,7 +3,6 @@ package p2p
 import (
 	"math"
 
-	"github.com/eoscanada/eos-go"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -43,7 +42,7 @@ func (s *syncManager) sendSyncRequest(peer *Peer) error {
 }
 
 // OnHandshakeMsg handler func imp
-func (s *syncManager) OnHandshakeMsg(peer *Peer, msg *eos.HandshakeMessage) {
+func (s *syncManager) OnHandshakeMsg(peer *Peer, msg *HandshakeMessage) {
 	if s.IsSyncAll {
 		s.originHeadBlock = msg.HeadNum
 		err := s.sendSyncRequest(peer)
@@ -57,7 +56,7 @@ func (s *syncManager) OnHandshakeMsg(peer *Peer, msg *eos.HandshakeMessage) {
 		msg.P2PAddress = peer.Name
 		err := peer.WriteP2PMessage(msg)
 		if err != nil {
-			peer.Close(eos.GoAwayNoReason)
+			peer.Close(GoAwayNoReason)
 			return
 		}
 		p2pLog.Debug("Handshake resent", zap.String("other", msg.P2PAddress))
@@ -66,20 +65,20 @@ func (s *syncManager) OnHandshakeMsg(peer *Peer, msg *eos.HandshakeMessage) {
 }
 
 // OnGoAwayMsg handler func imp
-func (s *syncManager) OnGoAwayMsg(peer *Peer, msg *eos.GoAwayMessage) {
+func (s *syncManager) OnGoAwayMsg(peer *Peer, msg *GoAwayMessage) {
 	p2pLog.Warn("peer goaway", zap.String("reason", msg.Reason.String()))
 	peer.ClosePeer()
 }
 
 // OnTimeMsg handler func imp
-func (s *syncManager) OnTimeMsg(peer *Peer, msg *eos.TimeMessage) {
+func (s *syncManager) OnTimeMsg(peer *Peer, msg *TimeMessage) {
 	if err := peer.SendTime(); err != nil {
 		p2pLog.Warn("send time msg to peer err", zap.Error(err))
 	}
 }
 
 // OnNoticeMsg handler func imp
-func (s *syncManager) OnNoticeMsg(peer *Peer, msg *eos.NoticeMessage) {
+func (s *syncManager) OnNoticeMsg(peer *Peer, msg *NoticeMessage) {
 	if s.IsSyncAll {
 		pendingNum := msg.KnownBlocks.Pending
 		if pendingNum > 0 {
@@ -94,17 +93,17 @@ func (s *syncManager) OnNoticeMsg(peer *Peer, msg *eos.NoticeMessage) {
 }
 
 // OnRequestMsg handler func imp
-func (s *syncManager) OnRequestMsg(peer *Peer, msg *eos.RequestMessage) {
+func (s *syncManager) OnRequestMsg(peer *Peer, msg *RequestMessage) {
 	// TODO: can sync to others
 }
 
 // OnSyncRequestMsg handler func imp
-func (s *syncManager) OnSyncRequestMsg(peer *Peer, msg *eos.SyncRequestMessage) {
+func (s *syncManager) OnSyncRequestMsg(peer *Peer, msg *SyncRequestMessage) {
 	// TODO: can sync to others
 }
 
 // OnSignedBlock handler func imp
-func (s *syncManager) OnSignedBlock(peer *Peer, msg *eos.SignedBlock) {
+func (s *syncManager) OnSignedBlock(peer *Peer, msg *SignedBlock) {
 	if s.IsSyncAll {
 		blockNum := msg.BlockNumber()
 		s.headBlock = blockNum
@@ -120,7 +119,7 @@ func (s *syncManager) OnSignedBlock(peer *Peer, msg *eos.SignedBlock) {
 			blockID, err := msg.BlockID()
 			if err != nil {
 				//errChannel <- errors.Wrap(err, "getting block id")
-				peer.Close(eos.GoAwayValidation)
+				peer.Close(GoAwayValidation)
 				return
 			}
 			peer.handshakeInfo.HeadBlockNum = blockNum
@@ -149,6 +148,6 @@ func (s *syncManager) OnSignedBlock(peer *Peer, msg *eos.SignedBlock) {
 }
 
 // OnPackedTransactionMsg handler func imp
-func (s *syncManager) OnPackedTransactionMsg(peer *Peer, msg *eos.PackedTransactionMessage) {
+func (s *syncManager) OnPackedTransactionMsg(peer *Peer, msg *PackedTransactionMessage) {
 	// do nothing
 }

@@ -11,7 +11,7 @@ import (
 )
 
 var peer = flag.String("peer", "localhost:9001", "peer to connect to")
-var chainID = flag.String("chain-id", "1c6ae7719a2a3b4ecb19584a30ff510ba1b6ded86e1fd8b8fc22f1179c622a32", "net chainID to connect to")
+var chainID = flag.String("chain-id", "322ec54a9f13ad434efe9bc76ed6c7df13e2543d83235bc7bedebb4e23af1f2c", "net chainID to connect to")
 var showLog = flag.Bool("v", true, "show detail log")
 
 func main() {

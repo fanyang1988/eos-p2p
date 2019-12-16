@@ -3,7 +3,6 @@ package p2p
 import (
 	"fmt"
 
-	eos "github.com/eoscanada/eos-go"
 	"go.uber.org/zap"
 )
 
@@ -12,11 +11,6 @@ import (
 
 // logger default use nil zap logger
 var p2pLog = zap.NewNop()
-
-// EnableP2PLogging enable p2p package to log by zap
-func EnableP2PLogging() {
-	p2pLog = eos.NewLogger(false)
-}
 
 // SetLogger set logger for p2p mode
 func SetLogger(l *zap.Logger) {

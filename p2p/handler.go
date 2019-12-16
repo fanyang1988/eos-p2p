@@ -3,16 +3,18 @@ package p2p
 import (
 	"encoding/json"
 
-	"github.com/eoscanada/eos-go"
 	"go.uber.org/zap"
 )
 
+// Handler interface for peer
 type Handler interface {
 	Handle(envelope *Envelope)
 }
 
+// HandlerFunc a func for Handler
 type HandlerFunc func(envelope *Envelope)
 
+// Handle imp handle
 func (f HandlerFunc) Handle(envelope *Envelope) {
 	f(envelope)
 }
@@ -41,14 +43,14 @@ var StringLoggerHandler = HandlerFunc(func(envelope *Envelope) {
 
 // MsgHandler handler for each msg
 type MsgHandler interface {
-	OnHandshakeMsg(peer *Peer, msg *eos.HandshakeMessage)
-	OnGoAwayMsg(peer *Peer, msg *eos.GoAwayMessage)
-	OnTimeMsg(peer *Peer, msg *eos.TimeMessage)
-	OnNoticeMsg(peer *Peer, msg *eos.NoticeMessage)
-	OnRequestMsg(peer *Peer, msg *eos.RequestMessage)
-	OnSyncRequestMsg(peer *Peer, msg *eos.SyncRequestMessage)
-	OnSignedBlock(peer *Peer, msg *eos.SignedBlock)
-	OnPackedTransactionMsg(peer *Peer, msg *eos.PackedTransactionMessage)
+	OnHandshakeMsg(peer *Peer, msg *HandshakeMessage)
+	OnGoAwayMsg(peer *Peer, msg *GoAwayMessage)
+	OnTimeMsg(peer *Peer, msg *TimeMessage)
+	OnNoticeMsg(peer *Peer, msg *NoticeMessage)
+	OnRequestMsg(peer *Peer, msg *RequestMessage)
+	OnSyncRequestMsg(peer *Peer, msg *SyncRequestMessage)
+	OnSignedBlock(peer *Peer, msg *SignedBlock)
+	OnPackedTransactionMsg(peer *Peer, msg *PackedTransactionMessage)
 }
 
 // MsgHandlerImp MsgHandler for p2p msg
@@ -66,44 +68,44 @@ func NewMsgHandler(handler MsgHandler) *MsgHandlerImp {
 // Handle implements Handler interface
 func (m MsgHandlerImp) Handle(envelope *Envelope) {
 	switch envelope.Packet.P2PMessage.(type) {
-	case *eos.HandshakeMessage:
-		handshakeMessage, ok := envelope.Packet.P2PMessage.(*eos.HandshakeMessage)
+	case *HandshakeMessage:
+		handshakeMessage, ok := envelope.Packet.P2PMessage.(*HandshakeMessage)
 		if ok && handshakeMessage != nil {
 			m.handler.OnHandshakeMsg(envelope.Sender, handshakeMessage)
 		}
-	// Now EOS has not use *eos.ChainSizeMessage
-	case *eos.GoAwayMessage:
-		goAwayMsg, ok := envelope.Packet.P2PMessage.(*eos.GoAwayMessage)
+	// Now EOS has not use *ChainSizeMessage
+	case *GoAwayMessage:
+		goAwayMsg, ok := envelope.Packet.P2PMessage.(*GoAwayMessage)
 		if ok && goAwayMsg != nil {
 			m.handler.OnGoAwayMsg(envelope.Sender, goAwayMsg)
 		}
-	case *eos.TimeMessage:
-		timeMessage, ok := envelope.Packet.P2PMessage.(*eos.TimeMessage)
+	case *TimeMessage:
+		timeMessage, ok := envelope.Packet.P2PMessage.(*TimeMessage)
 		if ok && timeMessage != nil {
 			m.handler.OnTimeMsg(envelope.Sender, timeMessage)
 		}
-	case *eos.NoticeMessage:
-		noticeMessage, ok := envelope.Packet.P2PMessage.(*eos.NoticeMessage)
+	case *NoticeMessage:
+		noticeMessage, ok := envelope.Packet.P2PMessage.(*NoticeMessage)
 		if ok && noticeMessage != nil {
 			m.handler.OnNoticeMsg(envelope.Sender, noticeMessage)
 		}
-	case *eos.RequestMessage:
-		requestMessage, ok := envelope.Packet.P2PMessage.(*eos.RequestMessage)
+	case *RequestMessage:
+		requestMessage, ok := envelope.Packet.P2PMessage.(*RequestMessage)
 		if ok && requestMessage != nil {
 			m.handler.OnRequestMsg(envelope.Sender, requestMessage)
 		}
-	case *eos.SyncRequestMessage:
-		syncRequestMessage, ok := envelope.Packet.P2PMessage.(*eos.SyncRequestMessage)
+	case *SyncRequestMessage:
+		syncRequestMessage, ok := envelope.Packet.P2PMessage.(*SyncRequestMessage)
 		if ok && syncRequestMessage != nil {
 			m.handler.OnSyncRequestMsg(envelope.Sender, syncRequestMessage)
 		}
-	case *eos.SignedBlock:
-		signedBlock, ok := envelope.Packet.P2PMessage.(*eos.SignedBlock)
+	case *SignedBlock:
+		signedBlock, ok := envelope.Packet.P2PMessage.(*SignedBlock)
 		if ok && signedBlock != nil {
 			m.handler.OnSignedBlock(envelope.Sender, signedBlock)
 		}
-	case *eos.PackedTransactionMessage:
-		packedTransactionMessage, ok := envelope.Packet.P2PMessage.(*eos.PackedTransactionMessage)
+	case *PackedTransactionMessage:
+		packedTransactionMessage, ok := envelope.Packet.P2PMessage.(*PackedTransactionMessage)
 		if ok && packedTransactionMessage != nil {
 			m.handler.OnPackedTransactionMsg(envelope.Sender, packedTransactionMessage)
 		}
