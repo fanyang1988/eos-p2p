@@ -30,6 +30,21 @@ type Peer struct {
 	cancelHandshakeTimeout chan bool
 }
 
+// PeerCfg config for peer
+type PeerCfg struct {
+	Name    string `json:"name"`
+	Address string `json:"addr"`
+}
+
+// GetName get peer name
+func (p PeerCfg) GetName() string {
+	if p.Name == "" {
+		return fmt.Sprintf("peer-cli-%s", p.Address)
+	}
+
+	return p.Name
+}
+
 // MarshalLogObject calls the underlying function from zap.
 func (p Peer) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("name", p.Name)
@@ -64,6 +79,26 @@ func (h HandshakeInfo) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
+// NewPeer create a peer
+func NewPeer(cfg *PeerCfg, headBlockNum uint32, chainID string) (*Peer, error) {
+	cID, err := hex.DecodeString(chainID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "decode chainID error")
+	}
+
+	res := &Peer{
+		Address: cfg.Address,
+		agent:   cfg.GetName(),
+		handshakeInfo: &HandshakeInfo{
+			ChainID:      cID,
+			HeadBlockNum: headBlockNum,
+		},
+		cancelHandshakeTimeout: make(chan bool),
+	}
+
+	return res, nil
+}
+
 // SetHandshakeTimeout set send handshake timeout
 func (p *Peer) SetHandshakeTimeout(timeout time.Duration) {
 	p.handshakeTimeout = timeout
@@ -72,16 +107,6 @@ func (p *Peer) SetHandshakeTimeout(timeout time.Duration) {
 // SetConnectionTimeout for net DialTimeout
 func (p *Peer) SetConnectionTimeout(timeout time.Duration) {
 	p.connectionTimeout = timeout
-}
-
-// NewPeer create a peer
-func NewPeer(address string, agent string, handshakeInfo *HandshakeInfo) *Peer {
-	return &Peer{
-		Address:                address,
-		agent:                  agent,
-		handshakeInfo:          handshakeInfo,
-		cancelHandshakeTimeout: make(chan bool),
-	}
 }
 
 func (p *Peer) Read() (*Packet, error) {

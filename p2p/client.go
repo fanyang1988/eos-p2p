@@ -1,14 +1,13 @@
 package p2p
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
-
-// TODO: use mutiply p2p peers
 
 // Client a p2p Client for eos chain
 type Client struct {
@@ -20,17 +19,74 @@ type Client struct {
 	wg sync.WaitGroup
 }
 
-// NewClient create a p2p client
-func NewClient(peer *Peer, needSync bool) *Client {
+// Options options for new client
+type Options struct {
+	needSync      bool
+	startBlockNum uint32
+	handlers      []Handler
+}
+
+// OptionFunc func for new client
+type OptionFunc func(*Options) error
+
+// WithNeedSync set client with needSync
+func WithNeedSync(startBlockNum uint32) OptionFunc {
+	return func(o *Options) error {
+		o.needSync = true
+		o.startBlockNum = startBlockNum
+		return nil
+	}
+}
+
+// WithHandler set client with a handler
+func WithHandler(h Handler) OptionFunc {
+	return func(o *Options) error {
+		o.handlers = append(o.handlers, h)
+		return nil
+	}
+}
+
+// NewClient create new client
+func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...OptionFunc) (*Client, error) {
+	if len(peers) == 0 {
+		return nil, errors.New("NoPeerCfg")
+	}
+
+	defaultOpts := Options{
+		handlers: make([]Handler, 0, 8),
+	}
+	for _, o := range opts {
+		err := o(&defaultOpts)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// TODO: support multiple peers
+	peer, err := NewPeer(peers[0], defaultOpts.startBlockNum, chainID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "new peer error")
+	}
+
 	client := &Client{
 		peer: peer,
 		sync: &syncManager{
-			IsSyncAll: needSync,
-			headBlock: peer.handshakeInfo.HeadBlockNum, // TODO use local store for blocks had got
+			IsSyncAll: defaultOpts.needSync,
+			headBlock: defaultOpts.startBlockNum,
 		},
 	}
 	client.RegisterHandler(NewMsgHandler(client.sync))
-	return client
+
+	for _, h := range defaultOpts.handlers {
+		client.RegisterHandler(h)
+	}
+
+	err = client.Start(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "start client error")
+	}
+
+	return client, nil
 }
 
 // Close close client
@@ -70,7 +126,7 @@ func triggerHandshake(peer *Peer) error {
 }
 
 // Start start client process gorountinue
-func (c *Client) Start() error {
+func (c *Client) Start(ctx context.Context) error {
 	p2pLog.Info("Starting client")
 
 	err := c.peer.Connect()

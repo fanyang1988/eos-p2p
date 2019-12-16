@@ -1,9 +1,8 @@
 package main
 
 import (
-	"encoding/hex"
+	"context"
 	"flag"
-	"log"
 
 	"go.uber.org/zap"
 
@@ -23,23 +22,25 @@ func main() {
 	}
 	defer Logger.Sync()
 
-	cID, err := hex.DecodeString(*chainID)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	Logger.Info("P2P Client ", zap.String("peer", *peer), zap.String("chainid", *chainID))
-	client := p2p.NewClient(
-		p2p.NewPeer(*peer, "eos-proxy", &p2p.HandshakeInfo{
-			ChainID:      cID,
-			HeadBlockNum: 1,
-		}),
-		true,
+	client, err := p2p.NewClient(
+		context.Background(),
+		*chainID,
+		[]*p2p.PeerCfg{
+			&p2p.PeerCfg{
+				Name:    "eos-p2p",
+				Address: *peer,
+			},
+		},
+		p2p.WithNeedSync(1),
+		p2p.WithHandler(p2p.StringLoggerHandler),
+		p2p.WithHandler(p2p.NewMsgHandler(&MsgHandler{})),
 	)
 
-	client.RegisterHandler(p2p.StringLoggerHandler)
-	client.RegisterHandler(p2p.NewMsgHandler(&MsgHandler{}))
-	client.Start()
+	if err != nil {
+		Logger.Error("new client error", zap.Error(err))
+		return
+	}
 
 	client.Wait()
 }
