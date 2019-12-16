@@ -141,6 +141,8 @@ func (p *Peer) SendHandshake(info *HandshakeInfo) error {
 		Generation:               int16(1),
 	}
 
+	p2pLog.Debug("info", zap.String("Name", handshake.String()))
+
 	err = p.WriteP2PMessage(handshake)
 	if err != nil {
 		err = errors.Wrapf(err, "sending handshake to %s", p.Address)

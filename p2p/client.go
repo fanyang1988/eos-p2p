@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"io"
 	"sync"
 	"time"
 
@@ -15,6 +16,8 @@ type Client struct {
 	handlers    []Handler
 	readTimeout time.Duration
 	sync        *syncManager
+
+	packetChan chan envelopMsg
 
 	wg sync.WaitGroup
 }
@@ -74,6 +77,7 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 			IsSyncAll: defaultOpts.needSync,
 			headBlock: defaultOpts.startBlockNum,
 		},
+		packetChan: make(chan envelopMsg, 256),
 	}
 	client.RegisterHandler(NewMsgHandler(client.sync))
 
@@ -107,51 +111,60 @@ func (c *Client) RegisterHandler(handler Handler) {
 	c.handlers = append(c.handlers, handler)
 }
 
-func (c *Client) peerLoop(peer *Peer) error {
-	for {
-		packet, err := peer.Read()
-		if err != nil {
-			return errors.Wrapf(err, "read message from %s", peer.Address)
-		}
-
-		envelope := newEnvelope(peer, packet)
-		for _, handle := range c.handlers {
-			handle.Handle(envelope)
-		}
-	}
+func (c *Client) closeAllPeer() {
+	c.peer.ClosePeer()
+	c.peer.Wait()
 }
 
-func triggerHandshake(peer *Peer) error {
-	return peer.SendHandshake(peer.handshakeInfo)
+func (c *Client) peerLoop(ctx context.Context) {
+	isStopped := false
+	for {
+		select {
+		case r, ok := <-c.packetChan:
+			if !ok {
+				p2pLog.Info("client peerLoop stop")
+				return
+			}
+
+			if r.err != nil {
+				if errors.Cause(r.err) != io.EOF {
+					p2pLog.Info("client res error", zap.Error(r.err))
+				} else {
+					p2pLog.Info("conn closed")
+				}
+				continue
+			}
+
+			envelope := newEnvelope(r.Sender, r.Packet)
+			for _, handle := range c.handlers {
+				handle.Handle(envelope)
+			}
+
+		case <-ctx.Done():
+			if !isStopped {
+				isStopped = true
+				p2pLog.Info("close p2p client")
+				c.closeAllPeer()
+				p2pLog.Info("all peer is closed, to close client peerLoop")
+				close(c.packetChan)
+			}
+		}
+	}
 }
 
 // Start start client process gorountinue
 func (c *Client) Start(ctx context.Context) error {
 	p2pLog.Info("Starting client")
 
-	err := c.peer.Start(ctx)
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		c.peerLoop(ctx)
+	}()
+
+	err := c.peer.Start(ctx, c)
 	if err != nil {
 		return errors.Wrap(err, "connect error")
-	}
-
-	// FIXME: there will be more peers
-	c.wg.Add(1)
-	go func(cc *Client) {
-		defer cc.wg.Done()
-		err := cc.peerLoop(cc.peer)
-
-		// Tmp Implement
-		if err != nil {
-			p2pLog.Error("read error", zap.Error(err), zap.String("peer", cc.peer.Address))
-			return
-		}
-	}(c)
-
-	if c.peer.handshakeInfo != nil {
-		err := triggerHandshake(c.peer)
-		if err != nil {
-			return errors.Wrap(err, "connect and start: trigger handshake")
-		}
 	}
 
 	return nil

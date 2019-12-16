@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"go.uber.org/zap"
 
@@ -13,6 +16,17 @@ var peer = flag.String("peer", "localhost:9001", "peer to connect to")
 var chainID = flag.String("chain-id", "322ec54a9f13ad434efe9bc76ed6c7df13e2543d83235bc7bedebb4e23af1f2c", "net chainID to connect to")
 var showLog = flag.Bool("v", true, "show detail log")
 
+// waitClose wait for term signal, then stop the server
+func waitClose() {
+	stopSignalChan := make(chan os.Signal, 1)
+	signal.Notify(stopSignalChan,
+		syscall.SIGINT,
+		syscall.SIGKILL,
+		syscall.SIGQUIT,
+		syscall.SIGUSR1)
+	<-stopSignalChan
+}
+
 func main() {
 	flag.Parse()
 
@@ -22,13 +36,14 @@ func main() {
 	}
 	defer Logger.Sync()
 
+	ctx, cf := context.WithCancel(context.Background())
+
 	Logger.Info("P2P Client ", zap.String("peer", *peer), zap.String("chainid", *chainID))
 	client, err := p2p.NewClient(
-		context.Background(),
+		ctx,
 		*chainID,
 		[]*p2p.PeerCfg{
 			&p2p.PeerCfg{
-				Name:    "eos-p2p",
 				Address: *peer,
 			},
 		},
@@ -42,5 +57,11 @@ func main() {
 		return
 	}
 
+	waitClose()
+
+	cf()
+
 	client.Wait()
+
+	Logger.Info("p2p node stopped")
 }
