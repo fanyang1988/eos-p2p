@@ -25,11 +25,12 @@ type Peer struct {
 	connection             net.Conn
 	reader                 io.Reader
 	handshakeInfo          *HandshakeInfo
+	readTimeout            time.Duration // TODO: no use this
 	connectionTimeout      time.Duration
-	handshakeTimeout       time.Duration
+	handshakeTimeout       time.Duration // TODO: no use this
 	cancelHandshakeTimeout chan bool
 	cli                    *Client
-	wg                     sync.WaitGroup
+	wg                     *sync.WaitGroup
 }
 
 // PeerCfg config for peer
@@ -39,7 +40,7 @@ type PeerCfg struct {
 }
 
 // MarshalLogObject calls the underlying function from zap.
-func (p Peer) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+func (p *Peer) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("name", p.Name)
 	enc.AddString("address", p.Address)
 	enc.AddString("agent", p.agent)
@@ -101,7 +102,9 @@ func NewPeer(cfg *PeerCfg, headBlockNum uint32, chainID string) (*Peer, error) {
 			ChainID:      cID,
 			HeadBlockNum: headBlockNum,
 		},
-		cancelHandshakeTimeout: make(chan bool),
+		cancelHandshakeTimeout: make(chan bool, 1),
+		connectionTimeout:      5 * time.Second,
+		wg:                     &sync.WaitGroup{},
 	}
 
 	return res, nil
@@ -118,12 +121,13 @@ func (p *Peer) SetConnectionTimeout(timeout time.Duration) {
 }
 
 func (p *Peer) Read() (*Packet, error) {
-	packet, err := readEOSPacket(p.reader)
-	if p.handshakeTimeout > 0 {
-		p.cancelHandshakeTimeout <- true
-	}
+	packet, err := readEOSPacket(p.reader, p.connection)
 	if err != nil {
 		return nil, errors.Wrapf(err, "connection: read %s err", p.Address)
+	}
+
+	if p.handshakeTimeout > 0 {
+		p.cancelHandshakeTimeout <- true
 	}
 
 	return packet, nil
@@ -218,6 +222,7 @@ func (p *Peer) readLoop() {
 		if err != nil {
 			//p2pLog.Warn("peer readLoop return by read error", zap.String("addr", p.Address), zap.Error(err))
 			p.cli.packetChan <- newEnvelopMsgWithError(p, errors.Wrapf(err, "read message from %s", p.Address))
+			p2pLog.Debug("peer readloop exit", zap.String("address", p.Address))
 			return
 		}
 

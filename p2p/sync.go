@@ -72,7 +72,7 @@ func (s *syncManager) OnGoAwayMsg(peer *Peer, msg *GoAwayMessage) {
 
 // OnTimeMsg handler func imp
 func (s *syncManager) OnTimeMsg(peer *Peer, msg *TimeMessage) {
-	if err := peer.SendTime(); err != nil {
+	if err := peer.SendTime(msg); err != nil {
 		p2pLog.Warn("send time msg to peer err", zap.Error(err))
 	}
 }

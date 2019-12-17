@@ -1,10 +1,14 @@
 package p2p
 
 import (
+	"encoding/binary"
+	"encoding/hex"
 	"io"
+	"net"
 
 	eos "github.com/eoscanada/eos-go"
 	"github.com/eoscanada/eos-go/ecc"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -88,10 +92,52 @@ func EnableP2PLogging() *zap.Logger {
 	return p2pLog
 }
 
-func readEOSPacket(r io.Reader) (packet *Packet, err error) {
-	return eos.ReadPacket(r)
+func readEOSPacket(r io.Reader, conn net.Conn) (packet *Packet, err error) {
+	return readPacket(r, conn)
 }
 
-func newEOSEncoder(w io.Writer) *eos.Encoder {
+func newEOSEncoder(w io.Writer, conn net.Conn) *eos.Encoder {
 	return eos.NewEncoder(w)
+}
+
+func readPacket(r io.Reader, conn net.Conn) (*Packet, error) {
+	data := make([]byte, 0)
+
+	lengthBytes := make([]byte, 4, 4)
+
+	if _, err := io.ReadFull(r, lengthBytes); err != nil {
+		return nil, errors.Wrapf(err, "readfull length")
+	}
+
+	data = append(data, lengthBytes...)
+
+	size := binary.LittleEndian.Uint32(lengthBytes)
+
+	if size > 16*1024*1024 {
+		return nil, errors.Errorf("packet is too large %d", size)
+	}
+
+	payloadBytes := make([]byte, size, size)
+
+	count, err := io.ReadFull(r, payloadBytes)
+
+	if err != nil {
+		return nil, errors.Errorf("read full data error")
+	}
+
+	if count != int(size) {
+		return nil, errors.Errorf("read full not full read[%d] expected[%d]", count, size)
+	}
+
+	data = append(data, payloadBytes...)
+
+	packet := &Packet{}
+	decoder := eos.NewDecoder(data)
+	decoder.DecodeActions(false)
+	err = decoder.Decode(packet)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failing decode data %s", hex.EncodeToString(data))
+	}
+	packet.Raw = data
+	return packet, nil
 }

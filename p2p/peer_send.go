@@ -3,6 +3,7 @@ package p2p
 import (
 	"bytes"
 	"runtime"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -17,7 +18,7 @@ func (p *Peer) WriteP2PMessage(message Message) (err error) {
 
 	buff := bytes.NewBuffer(make([]byte, 0, 512))
 
-	encoder := newEOSEncoder(buff)
+	encoder := newEOSEncoder(buff, p.connection)
 	err = encoder.Encode(packet)
 	if err != nil {
 		return errors.Wrapf(err, "unable to encode message %s", message)
@@ -99,10 +100,17 @@ func (p *Peer) SendNotice(headBlockNum uint32, libNum uint32, mode byte) error {
 }
 
 // SendTime send time sync msg to peer
-func (p *Peer) SendTime() error {
+func (p *Peer) SendTime(recv *TimeMessage) error {
 	p2pLog.Debug("SendTime", zap.String("peer", p.Address))
 
 	notice := &TimeMessage{}
+
+	if recv != nil {
+		notice.Origin = recv.Transmit
+		notice.Receive = recv.Destination
+		notice.Transmit = Tstamp{time.Now()}
+	}
+
 	return errors.WithStack(p.WriteP2PMessage(notice))
 }
 
