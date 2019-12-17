@@ -12,8 +12,8 @@ import (
 	"github.com/fanyang1988/eos-p2p/p2p"
 )
 
-var peer = flag.String("peer", "localhost:9001", "peer to connect to")
-var chainID = flag.String("chain-id", "322ec54a9f13ad434efe9bc76ed6c7df13e2543d83235bc7bedebb4e23af1f2c", "net chainID to connect to")
+var peer = flag.String("peer", "localhost:9000", "peer to connect to")
+var chainID = flag.String("chain-id", "1b85dedb0a11a73443f1baa1667499b2329283d516b368698a7f2e16bc3a3232", "net chainID to connect to")
 var showLog = flag.Bool("v", true, "show detail log")
 
 // waitClose wait for term signal, then stop the server
@@ -38,16 +38,28 @@ func main() {
 
 	ctx, cf := context.WithCancel(context.Background())
 
+	peers := []string{
+		"localhost:9000",
+		"localhost:9001",
+		"localhost:9002",
+		"localhost:9003",
+		"localhost:9004",
+		"localhost:9005",
+	}
+
+	peersCfg := make([]*p2p.PeerCfg, 0, len(peers))
+	for _, p := range peers {
+		peersCfg = append(peersCfg, &p2p.PeerCfg{
+			Address: p,
+		})
+	}
+
 	Logger.Info("P2P Client ", zap.String("peer", *peer), zap.String("chainid", *chainID))
 	client, err := p2p.NewClient(
 		ctx,
 		*chainID,
-		[]*p2p.PeerCfg{
-			&p2p.PeerCfg{
-				Address: *peer,
-			},
-		},
-		p2p.WithNeedSync(1),
+		peersCfg,
+		//p2p.WithNeedSync(1),
 		p2p.WithHandler(p2p.StringLoggerHandler),
 		p2p.WithHandler(p2p.NewMsgHandler(&MsgHandler{})),
 	)

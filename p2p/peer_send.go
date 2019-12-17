@@ -108,7 +108,9 @@ func (p *Peer) SendTime(recv *TimeMessage) error {
 	if recv != nil {
 		notice.Origin = recv.Transmit
 		notice.Receive = recv.Destination
-		notice.Transmit = Tstamp{time.Now()}
+		notice.Transmit = Tstamp{
+			Time: time.Now(),
+		}
 	}
 
 	return errors.WithStack(p.WriteP2PMessage(notice))

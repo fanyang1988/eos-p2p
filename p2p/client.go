@@ -10,9 +10,25 @@ import (
 	"go.uber.org/zap"
 )
 
+type peerStatusTyp uint8
+
+const (
+	peerStatNormal = peerStatusTyp(iota)
+	peerStatInited
+	peerStatConnecting
+	peerStatError
+	peerStatClosed
+)
+
+type peerStatus struct {
+	peer   *Peer
+	cfg    *PeerCfg
+	status peerStatusTyp
+}
+
 // Client a p2p Client for eos chain
 type Client struct {
-	peer        *Peer
+	ps          []peerStatus
 	handlers    []Handler
 	readTimeout time.Duration
 	sync        *syncManager
@@ -66,14 +82,23 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 		}
 	}
 
-	// TODO: support multiple peers
-	peer, err := NewPeer(peers[0], defaultOpts.startBlockNum, chainID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "new peer error")
+	ps := make([]peerStatus, 0, 64)
+
+	for _, p := range peers {
+		peer, err := NewPeer(p, defaultOpts.startBlockNum, chainID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "new peer error")
+		}
+
+		ps = append(ps, peerStatus{
+			peer:   peer,
+			status: peerStatInited,
+			cfg:    p,
+		})
 	}
 
 	client := &Client{
-		peer: peer,
+		ps: ps,
 		sync: &syncManager{
 			IsSyncAll: defaultOpts.needSync,
 			headBlock: defaultOpts.startBlockNum,
@@ -87,20 +112,12 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 		client.RegisterHandler(h)
 	}
 
-	err = client.Start(ctx)
+	err := client.Start(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "start client error")
 	}
 
 	return client, nil
-}
-
-// Close close client
-func (c *Client) Close() error {
-	if c.peer.connection == nil {
-		return nil
-	}
-	return c.peer.connection.Close()
 }
 
 // SetReadTimeout set conn io readtimeout
@@ -114,8 +131,13 @@ func (c *Client) RegisterHandler(handler Handler) {
 }
 
 func (c *Client) closeAllPeer() {
-	c.peer.ClosePeer()
-	c.peer.Wait()
+	for _, p := range c.ps {
+		p.peer.ClosePeer()
+	}
+
+	for _, p := range c.ps {
+		p.peer.Wait()
+	}
 }
 
 func (c *Client) peerMngLoop(ctx context.Context) {
@@ -210,7 +232,9 @@ func (c *Client) Start(ctx context.Context) error {
 		c.peerMngLoop(ctx)
 	}()
 
-	c.StartPeer(ctx, c.peer)
+	for _, p := range c.ps {
+		c.StartPeer(ctx, p.peer)
+	}
 	return nil
 }
 
@@ -221,7 +245,8 @@ func (c *Client) Wait() {
 
 // StartPeer start a peer r/w
 func (c *Client) StartPeer(ctx context.Context, p *Peer) {
-	err := c.peer.Start(ctx, c)
+	p2pLog.Info("Start Connect Peer", zap.String("peer", p.Address))
+	err := p.Start(ctx, c)
 	if err != nil {
 		c.peerChan <- peerMsg{
 			err:    errors.Wrap(err, "connect error"),
