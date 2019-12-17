@@ -18,6 +18,7 @@ type Client struct {
 	sync        *syncManager
 
 	packetChan chan envelopMsg
+	peerChan   chan peerMsg
 
 	wg sync.WaitGroup
 }
@@ -78,6 +79,7 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 			headBlock: defaultOpts.startBlockNum,
 		},
 		packetChan: make(chan envelopMsg, 256),
+		peerChan:   make(chan peerMsg, 8),
 	}
 	client.RegisterHandler(NewMsgHandler(client.sync))
 
@@ -131,6 +133,13 @@ func (c *Client) peerLoop(ctx context.Context) {
 					p2pLog.Info("client res error", zap.Error(r.err))
 				} else {
 					p2pLog.Info("conn closed")
+					if !isStopped {
+						c.peerChan <- peerMsg{
+							err:    r.err,
+							peer:   r.Sender,
+							msgTyp: peerMsgErrPeer,
+						}
+					}
 				}
 				continue
 			}
@@ -140,13 +149,33 @@ func (c *Client) peerLoop(ctx context.Context) {
 				handle.Handle(envelope)
 			}
 
+		case p, ok := <-c.peerChan:
+			if !ok {
+				c.closeAllPeer()
+				p2pLog.Info("all peer is closed, to close client peerLoop")
+				close(c.packetChan) // FIXME: will error
+				continue
+			}
+
+			if ok && p.peer != nil {
+				switch p.msgTyp {
+				case peerMsgNewPeer:
+				case peerMsgDelPeer:
+				case peerMsgErrPeer:
+					if !isStopped && p.err != nil {
+						p2pLog.Info("reconnect peer", zap.String("addr", p.peer.Address))
+						c.StartPeer(ctx, p.peer)
+						// TODO: use a gorountinue to startPeer and wait
+						time.Sleep(5 * time.Second)
+					}
+				}
+			}
+
 		case <-ctx.Done():
 			if !isStopped {
 				isStopped = true
 				p2pLog.Info("close p2p client")
-				c.closeAllPeer()
-				p2pLog.Info("all peer is closed, to close client peerLoop")
-				close(c.packetChan)
+				close(c.peerChan)
 			}
 		}
 	}
@@ -162,15 +191,25 @@ func (c *Client) Start(ctx context.Context) error {
 		c.peerLoop(ctx)
 	}()
 
-	err := c.peer.Start(ctx, c)
-	if err != nil {
-		return errors.Wrap(err, "connect error")
-	}
-
+	c.StartPeer(ctx, c.peer)
 	return nil
 }
 
 // Wait wait client closed
 func (c *Client) Wait() {
 	c.wg.Wait()
+}
+
+// StartPeer start a peer r/w
+func (c *Client) StartPeer(ctx context.Context, p *Peer) {
+	err := c.peer.Start(ctx, c)
+	if err != nil {
+		c.peerChan <- peerMsg{
+			err:    errors.Wrap(err, "connect error"),
+			peer:   p,
+			msgTyp: peerMsgErrPeer,
+		}
+	}
+
+	return
 }
