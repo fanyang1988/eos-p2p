@@ -67,7 +67,7 @@ func (c *Client) onNewPeer(ctx context.Context, msg *peerMsg) {
 		p2pLog.Error("new peer failed", zap.String("addr", msg.peer.Address), zap.Error(err))
 	}
 
-	c.ps[msg.cfg.Address] = peerStatus{
+	c.ps[msg.cfg.Address] = &peerStatus{
 		peer:   peer,
 		status: peerStatInited,
 		cfg:    msg.cfg,
@@ -77,21 +77,54 @@ func (c *Client) onNewPeer(ctx context.Context, msg *peerMsg) {
 }
 
 func (c *Client) onDelPeer(ctx context.Context, msg *peerMsg) {
-	p2pLog.Info("del peer", zap.String("addr", msg.peer.Address))
+	ps, ok := c.ps[msg.cfg.Address]
+	if !ok {
+		p2pLog.Error("no status for peer found", zap.String("peer", msg.cfg.Address))
+		return // no process
+	}
+
+	p2pLog.Info("del peer", zap.String("addr", msg.cfg.Address))
+
+	ps.status = peerStatClosed
+	ps.peer.ClosePeer()
+	ps.peer.Wait()
+
+	p2pLog.Info("peer closed", zap.String("addr", msg.cfg.Address))
 }
 
 func (c *Client) onErrPeer(ctx context.Context, msg *peerMsg) {
-	if msg.err != nil && msg.peer != nil {
-		p2pLog.Info("reconnect peer", zap.String("addr", msg.peer.Address))
-		if err := c.StartPeer(ctx, msg.peer); err != nil {
-			time.Sleep(3 * time.Second)
-		}
+	if msg.err == nil || msg.peer == nil {
+		return
 	}
+
+	ps, ok := c.ps[msg.peer.Address]
+	if !ok {
+		p2pLog.Error("no status for peer found", zap.String("peer", msg.peer.Address))
+		return // no process
+	}
+
+	if ps.status == peerStatClosed {
+		// had Closed no reconned
+		return
+	}
+
+	p2pLog.Info("reconnect peer", zap.String("addr", msg.peer.Address))
+	if err := c.StartPeer(ctx, msg.peer); err != nil {
+		time.Sleep(3 * time.Second)
+	}
+
 }
 
 // StartPeer start a peer r/w
 func (c *Client) StartPeer(ctx context.Context, p *Peer) error {
 	p2pLog.Info("Start Connect Peer", zap.String("peer", p.Address))
+
+	ps, ok := c.ps[p.Address]
+	if !ok {
+		p2pLog.Error("no status for peer found", zap.String("peer", p.Address))
+		return nil // no process
+	}
+
 	err := p.Start(ctx, c)
 	if err != nil {
 		c.peerChan <- peerMsg{
@@ -102,6 +135,8 @@ func (c *Client) StartPeer(ctx context.Context, p *Peer) error {
 		return err
 	}
 
+	ps.status = peerStatNormal
+
 	return nil
 }
 
@@ -110,6 +145,17 @@ func (c *Client) NewPeer(cfg *PeerCfg) error {
 	c.peerChan <- peerMsg{
 		msgTyp: peerMsgNewPeer,
 		cfg:    cfg,
+	}
+	return nil
+}
+
+// DelPeerByAddress delete peer and close
+func (c *Client) DelPeerByAddress(address string) error {
+	c.peerChan <- peerMsg{
+		msgTyp: peerMsgDelPeer,
+		cfg: &PeerCfg{
+			Address: address,
+		},
 	}
 	return nil
 }

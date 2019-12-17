@@ -16,7 +16,6 @@ type peerStatusTyp uint8
 const (
 	peerStatNormal = peerStatusTyp(iota)
 	peerStatInited
-	peerStatConnecting
 	peerStatError
 	peerStatClosed
 )
@@ -29,7 +28,7 @@ type peerStatus struct {
 
 // Client a p2p Client for eos chain
 type Client struct {
-	ps          map[string]peerStatus
+	ps          map[string]*peerStatus
 	handlers    []Handler
 	readTimeout time.Duration
 	sync        *syncManager
@@ -93,7 +92,7 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 	}
 
 	client := &Client{
-		ps: make(map[string]peerStatus, 64),
+		ps: make(map[string]*peerStatus, 64),
 		sync: &syncManager{
 			IsSyncAll: defaultOpts.needSync,
 			headBlock: defaultOpts.startBlockNum,
