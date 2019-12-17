@@ -118,6 +118,39 @@ func (c *Client) closeAllPeer() {
 	c.peer.Wait()
 }
 
+func (c *Client) peerMngLoop(ctx context.Context) {
+	for {
+		select {
+		case p := <-c.peerChan:
+			// if already stop loop so close directly
+			select {
+			case <-ctx.Done():
+				p2pLog.Info("close peer chan mng")
+				return
+			default:
+			}
+
+			if p.peer != nil {
+				switch p.msgTyp {
+				case peerMsgNewPeer:
+				case peerMsgDelPeer:
+				case peerMsgErrPeer:
+					if p.err != nil {
+						p2pLog.Info("reconnect peer", zap.String("addr", p.peer.Address))
+						c.StartPeer(ctx, p.peer)
+						time.Sleep(3 * time.Second)
+					}
+				}
+			}
+
+		case <-ctx.Done():
+			// no need wait all msg in chan processed
+			p2pLog.Info("close peer chan mng")
+			return
+		}
+	}
+}
+
 func (c *Client) peerLoop(ctx context.Context) {
 	isStopped := false
 	for {
@@ -149,33 +182,13 @@ func (c *Client) peerLoop(ctx context.Context) {
 				handle.Handle(envelope)
 			}
 
-		case p, ok := <-c.peerChan:
-			if !ok {
-				c.closeAllPeer()
-				p2pLog.Info("all peer is closed, to close client peerLoop")
-				close(c.packetChan) // FIXME: will error
-				continue
-			}
-
-			if ok && p.peer != nil {
-				switch p.msgTyp {
-				case peerMsgNewPeer:
-				case peerMsgDelPeer:
-				case peerMsgErrPeer:
-					if !isStopped && p.err != nil {
-						p2pLog.Info("reconnect peer", zap.String("addr", p.peer.Address))
-						c.StartPeer(ctx, p.peer)
-						// TODO: use a gorountinue to startPeer and wait
-						time.Sleep(5 * time.Second)
-					}
-				}
-			}
-
 		case <-ctx.Done():
 			if !isStopped {
 				isStopped = true
 				p2pLog.Info("close p2p client")
-				close(c.peerChan)
+				c.closeAllPeer()
+				p2pLog.Info("all peer is closed, to close client peerLoop")
+				close(c.packetChan)
 			}
 		}
 	}
@@ -189,6 +202,12 @@ func (c *Client) Start(ctx context.Context) error {
 	go func() {
 		defer c.wg.Done()
 		c.peerLoop(ctx)
+	}()
+
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		c.peerMngLoop(ctx)
 	}()
 
 	c.StartPeer(ctx, c.peer)
