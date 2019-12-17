@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"encoding/hex"
 	"io"
 	"sync"
 	"time"
@@ -32,9 +33,13 @@ type Client struct {
 	handlers    []Handler
 	readTimeout time.Duration
 	sync        *syncManager
+	chainID     Checksum256
 
 	packetChan chan envelopMsg
 	peerChan   chan peerMsg
+
+	// TODO: client sync status should get from block forkdb
+	headBlockNum uint32
 
 	wg sync.WaitGroup
 }
@@ -82,29 +87,21 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 		}
 	}
 
-	ps := make(map[string]peerStatus, 64)
-
-	for _, p := range peers {
-		peer, err := NewPeer(p, defaultOpts.startBlockNum, chainID)
-		if err != nil {
-			return nil, errors.Wrapf(err, "new peer error")
-		}
-
-		ps[peer.Address] = peerStatus{
-			peer:   peer,
-			status: peerStatInited,
-			cfg:    p,
-		}
+	cID, err := hex.DecodeString(chainID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "decode chainID error")
 	}
 
 	client := &Client{
-		ps: ps,
+		ps: make(map[string]peerStatus, 64),
 		sync: &syncManager{
 			IsSyncAll: defaultOpts.needSync,
 			headBlock: defaultOpts.startBlockNum,
 		},
-		packetChan: make(chan envelopMsg, 256),
-		peerChan:   make(chan peerMsg, 8),
+		packetChan:   make(chan envelopMsg, 256),
+		peerChan:     make(chan peerMsg, 8),
+		chainID:      cID,
+		headBlockNum: defaultOpts.startBlockNum,
 	}
 	client.RegisterHandler(NewMsgHandler(client.sync))
 
@@ -112,9 +109,13 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 		client.RegisterHandler(h)
 	}
 
-	err := client.Start(ctx)
+	err = client.Start(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "start client error")
+	}
+
+	for _, p := range peers {
+		client.NewPeer(p)
 	}
 
 	return client, nil
@@ -199,13 +200,20 @@ func (c *Client) Start(ctx context.Context) error {
 		c.peerMngLoop(ctx)
 	}()
 
-	for _, p := range c.ps {
-		c.StartPeer(ctx, p.peer)
-	}
 	return nil
 }
 
 // Wait wait client closed
 func (c *Client) Wait() {
 	c.wg.Wait()
+}
+
+// ChainID get chainID from the net client to connect
+func (c *Client) ChainID() Checksum256 {
+	return c.chainID
+}
+
+// HeadBlockNum get head block number current
+func (c *Client) HeadBlockNum() uint32 {
+	return c.headBlockNum // TODO: need from forkdb, now is const to 1
 }

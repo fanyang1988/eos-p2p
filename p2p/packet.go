@@ -34,18 +34,3 @@ func newEnvelopMsg(sender *Peer, packet *Packet) envelopMsg {
 		err:    nil,
 	}
 }
-
-// peerMsg for peer new/delete/error msg
-type peerMsg struct {
-	msgTyp peerMsgTyp
-	peer   *Peer
-	err    error
-}
-
-type peerMsgTyp uint8
-
-const (
-	peerMsgNewPeer = peerMsgTyp(iota)
-	peerMsgDelPeer
-	peerMsgErrPeer
-)

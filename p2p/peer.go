@@ -74,14 +74,9 @@ func (h HandshakeInfo) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 }
 
 // NewPeer create a peer
-func NewPeer(cfg *PeerCfg, headBlockNum uint32, chainID string) (*Peer, error) {
-	cID, err := hex.DecodeString(chainID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "decode chainID error")
-	}
-
+func NewPeer(cfg *PeerCfg, headBlockNum uint32, chainID Checksum256) (*Peer, error) {
 	nodeID := make([]byte, 32)
-	_, err = rand.Read(nodeID)
+	_, err := rand.Read(nodeID)
 	if err != nil {
 		return nil, errors.Wrap(err, "generating random node id error")
 	}
@@ -99,7 +94,7 @@ func NewPeer(cfg *PeerCfg, headBlockNum uint32, chainID string) (*Peer, error) {
 		agent:   name,
 		Name:    name,
 		handshakeInfo: &HandshakeInfo{
-			ChainID:      cID,
+			ChainID:      chainID,
 			HeadBlockNum: headBlockNum,
 		},
 		cancelHandshakeTimeout: make(chan bool, 1),
