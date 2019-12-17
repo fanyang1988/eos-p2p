@@ -101,8 +101,9 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 		chainID:      cID,
 		headBlockNum: defaultOpts.startBlockNum,
 	}
-	client.handlers = append(client.handlers, NewMsgHandler("sync", client.sync))
 
+	// init handlers no need keep sync
+	client.handlers = append(client.handlers, NewMsgHandler("sync", client.sync))
 	for _, h := range defaultOpts.handlers {
 		client.handlers = append(client.handlers, h)
 	}

@@ -13,13 +13,14 @@ type envelopMsgTyp uint8
 const (
 	envelopMsgNil = envelopMsgTyp(iota)
 	envelopMsgAddHandler
+	envelopMsgDelHandler
 	envelopMsgError
 	envelopMsgPacket
 )
 
 type envelopMsg struct {
 	Sender  *Peer
-	Packet  *Packet `json:"envelope"`
+	Packet  *Packet
 	handler Handler
 	typ     envelopMsgTyp
 	err     error
@@ -48,6 +49,13 @@ func newHandlerAddMsg(h Handler) envelopMsg {
 	}
 }
 
+func newHandlerDelMsg(h Handler) envelopMsg {
+	return envelopMsg{
+		handler: h,
+		typ:     envelopMsgDelHandler,
+	}
+}
+
 func (c *Client) peerLoop(ctx context.Context) {
 	isStopped := false
 	for {
@@ -60,8 +68,31 @@ func (c *Client) peerLoop(ctx context.Context) {
 
 			switch r.typ {
 			case envelopMsgAddHandler:
-				p2pLog.Info("new handler")
+				hname := r.handler.Name()
+				p2pLog.Info("new handler", zap.String("name", hname))
+				for idx, h := range c.handlers {
+					if h.Name() == hname {
+						p2pLog.Info("replace handler", zap.String("name", hname))
+						c.handlers[idx] = r.handler
+						continue
+					}
+				}
 				c.handlers = append(c.handlers, r.handler)
+
+			case envelopMsgDelHandler:
+				hname := r.handler.Name()
+				p2pLog.Info("del handler", zap.String("name", hname))
+				for idx, h := range c.handlers {
+					if h.Name() == hname {
+						// not change seq with handlers
+						for i := idx; i < len(c.handlers)-1; i++ {
+							c.handlers[i] = c.handlers[i+1]
+						}
+						c.handlers = c.handlers[:len(c.handlers)-1]
+						continue
+					}
+				}
+				p2pLog.Warn("no found hander to del", zap.String("name", hname))
 
 			case envelopMsgError:
 				if r.err != nil {
@@ -100,5 +131,5 @@ func (c *Client) peerLoop(ctx context.Context) {
 
 // RegisterHandler reg handler to client
 func (c *Client) RegisterHandler(handler Handler) {
-	c.handlers = append(c.handlers, handler)
+	c.packetChan <- newHandlerAddMsg(handler)
 }
