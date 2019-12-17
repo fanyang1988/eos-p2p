@@ -13,7 +13,7 @@ type peerStatusTyp uint8
 
 const (
 	peerStatNormal = peerStatusTyp(iota)
-	peerStatInited
+	peerStatInit
 	peerStatError
 	peerStatClosed
 )

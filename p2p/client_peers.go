@@ -69,7 +69,7 @@ func (c *Client) onNewPeer(ctx context.Context, msg *peerMsg) {
 
 	c.ps[msg.cfg.Address] = &peerStatus{
 		peer:   peer,
-		status: peerStatInited,
+		status: peerStatInit,
 		cfg:    msg.cfg,
 	}
 

@@ -55,7 +55,7 @@ func main() {
 		})
 	}
 
-	Logger.Info("P2P Client ", zap.String("peer", *peer), zap.String("chainid", *chainID))
+	Logger.Info("P2P Client ", zap.String("peer", *peer), zap.String("chainID", *chainID))
 	client, err := p2p.NewClient(
 		ctx,
 		*chainID,

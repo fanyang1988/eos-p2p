@@ -68,54 +68,15 @@ func (c *Client) peerLoop(ctx context.Context) {
 
 			switch r.typ {
 			case envelopMsgAddHandler:
-				hname := r.handler.Name()
-				p2pLog.Info("new handler", zap.String("name", hname))
-				for idx, h := range c.handlers {
-					if h.Name() == hname {
-						p2pLog.Info("replace handler", zap.String("name", hname))
-						c.handlers[idx] = r.handler
-						continue
-					}
-				}
-				c.handlers = append(c.handlers, r.handler)
-
+				c.onAddHandlerMsg(&r)
 			case envelopMsgDelHandler:
-				hname := r.handler.Name()
-				p2pLog.Info("del handler", zap.String("name", hname))
-				for idx, h := range c.handlers {
-					if h.Name() == hname {
-						// not change seq with handlers
-						for i := idx; i < len(c.handlers)-1; i++ {
-							c.handlers[i] = c.handlers[i+1]
-						}
-						c.handlers = c.handlers[:len(c.handlers)-1]
-						continue
-					}
-				}
-				p2pLog.Warn("no found hander to del", zap.String("name", hname))
-
+				c.onDelHandlerMsg(&r)
 			case envelopMsgError:
-				if r.err != nil {
-					if errors.Cause(r.err) != io.EOF {
-						p2pLog.Info("client res error", zap.Error(r.err))
-					} else {
-						p2pLog.Info("conn closed")
-						if !isStopped {
-							c.peerChan <- peerMsg{
-								err:    r.err,
-								peer:   r.Sender,
-								msgTyp: peerMsgErrPeer,
-							}
-						}
-					}
-					continue
+				if !isStopped {
+					c.onPeerErrorMsg(&r)
 				}
 			case envelopMsgPacket:
-				envelope := newEnvelope(r.Sender, r.Packet)
-				c.syncHandler.Handle(envelope)
-				for _, handle := range c.handlers {
-					handle.Handle(envelope)
-				}
+				c.onPacketMsg(&r)
 			}
 
 		case <-ctx.Done():
@@ -128,6 +89,61 @@ func (c *Client) peerLoop(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (c *Client) onAddHandlerMsg(r *envelopMsg) {
+	handlerName := r.handler.Name()
+	p2pLog.Info("new handler", zap.String("name", handlerName))
+	for idx, h := range c.handlers {
+		if h.Name() == handlerName {
+			p2pLog.Info("replace handler", zap.String("name", handlerName))
+			c.handlers[idx] = r.handler
+			return
+		}
+	}
+	c.handlers = append(c.handlers, r.handler)
+}
+
+func (c *Client) onDelHandlerMsg(r *envelopMsg) {
+	handlerName := r.handler.Name()
+	p2pLog.Info("del handler", zap.String("name", handlerName))
+	for idx, h := range c.handlers {
+		if h.Name() == handlerName {
+			// not change seq with handlers
+			for i := idx; i < len(c.handlers)-1; i++ {
+				c.handlers[i] = c.handlers[i+1]
+			}
+			c.handlers = c.handlers[:len(c.handlers)-1]
+			return
+		}
+	}
+	p2pLog.Warn("no found hander to del", zap.String("name", handlerName))
+}
+
+func (c *Client) onPacketMsg(r *envelopMsg) {
+	envelope := newEnvelope(r.Sender, r.Packet)
+	c.syncHandler.Handle(envelope)
+	for _, handle := range c.handlers {
+		handle.Handle(envelope)
+	}
+}
+
+func (c *Client) onPeerErrorMsg(r *envelopMsg) {
+	if r.err == nil {
+		return
+	}
+
+	if errors.Cause(r.err) != io.EOF {
+		p2pLog.Info("client res error", zap.Error(r.err))
+	} else {
+		p2pLog.Info("conn closed")
+		c.peerChan <- peerMsg{
+			err:    r.err,
+			peer:   r.Sender,
+			msgTyp: peerMsgErrPeer,
+		}
+	}
+
 }
 
 // RegisterHandler reg handler to client
