@@ -18,19 +18,17 @@ import (
 
 // Peer a p2p peer to other
 type Peer struct {
-	Address                string
-	Name                   string
-	agent                  string
-	NodeID                 []byte
-	connection             net.Conn
-	reader                 io.Reader
-	handshakeInfo          *HandshakeInfo
-	readTimeout            time.Duration // TODO: no use this
-	connectionTimeout      time.Duration
-	handshakeTimeout       time.Duration // TODO: no use this
-	cancelHandshakeTimeout chan bool
-	cli                    *Client
-	wg                     *sync.WaitGroup
+	Address           string
+	Name              string
+	agent             string
+	NodeID            []byte
+	connection        net.Conn
+	reader            io.Reader
+	handshakeInfo     *HandshakeInfo
+	readTimeout       time.Duration // TODO: no use this
+	connectionTimeout time.Duration
+	cli               *Client
+	wg                *sync.WaitGroup
 }
 
 // PeerCfg config for peer
@@ -97,17 +95,11 @@ func NewPeer(cfg *PeerCfg, headBlockNum uint32, chainID Checksum256) (*Peer, err
 			ChainID:      chainID,
 			HeadBlockNum: headBlockNum,
 		},
-		cancelHandshakeTimeout: make(chan bool, 1),
-		connectionTimeout:      5 * time.Second,
-		wg:                     &sync.WaitGroup{},
+		connectionTimeout: 5 * time.Second,
+		wg:                &sync.WaitGroup{},
 	}
 
 	return res, nil
-}
-
-// SetHandshakeTimeout set send handshake timeout
-func (p *Peer) SetHandshakeTimeout(timeout time.Duration) {
-	p.handshakeTimeout = timeout
 }
 
 // SetConnectionTimeout for net DialTimeout
@@ -119,10 +111,6 @@ func (p *Peer) Read() (*Packet, error) {
 	packet, err := readEOSPacket(p.reader, p.connection)
 	if err != nil {
 		return nil, errors.Wrapf(err, "connection: read %s err", p.Address)
-	}
-
-	if p.handshakeTimeout > 0 {
-		p.cancelHandshakeTimeout <- true
 	}
 
 	return packet, nil
@@ -149,35 +137,20 @@ func (p *Peer) Start(ctx context.Context, client *Client) error {
 	p2pLog.Info("Dialing", address2log, zap.Duration("timeout", p.connectionTimeout))
 	err := p.connect()
 	if err != nil {
-		if p.handshakeTimeout > 0 {
-			p.cancelHandshakeTimeout <- true
-		}
 		return err
 	}
 
 	if p.handshakeInfo != nil {
-		err := p.SendHandshake(p.handshakeInfo)
-		if err != nil {
-			return errors.Wrap(err, "connect and start: trigger handshake")
-		}
+		//err := p.SendHandshake(p.handshakeInfo)
+		//if err != nil {
+		//	return errors.Wrap(err, "connect and start: trigger handshake")
+		//}
 	}
 
 	go func() {
 		p.wg.Add(1)
 		p.readLoop()
 	}()
-
-	if p.handshakeTimeout > 0 {
-		go func(p *Peer) {
-			select {
-			case <-time.After(p.handshakeTimeout):
-				p2pLog.Warn("handshake took too long", address2log)
-				p.Close(goAwayNoReason)
-			case <-p.cancelHandshakeTimeout:
-				p2pLog.Warn("cancelHandshakeTimeout canceled", address2log)
-			}
-		}(p)
-	}
 
 	return nil
 }
