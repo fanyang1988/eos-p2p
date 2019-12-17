@@ -38,7 +38,7 @@ type Client struct {
 	packetChan chan envelopMsg
 	peerChan   chan peerMsg
 
-	// TODO: client sync status should get from block forkdb
+	// TODO: client sync status should get from block forkDB
 	headBlockNum uint32
 
 	readTimeout time.Duration
@@ -140,7 +140,7 @@ func (c *Client) closeAllPeer() {
 	}
 }
 
-// Start start client process gorountinue
+// Start start client process goroutine
 func (c *Client) Start(ctx context.Context) error {
 	p2pLog.Info("Starting client")
 
@@ -171,5 +171,5 @@ func (c *Client) ChainID() Checksum256 {
 
 // HeadBlockNum get head block number current
 func (c *Client) HeadBlockNum() uint32 {
-	return c.headBlockNum // TODO: need from forkdb, now is const to 1
+	return c.headBlockNum // TODO: need from forkDB, now is const to 1
 }

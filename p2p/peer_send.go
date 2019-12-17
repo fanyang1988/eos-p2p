@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// WriteP2PMessage wrrite a p2p msg to peer
+// WriteP2PMessage write a p2p msg to peer
 func (p *Peer) WriteP2PMessage(message Message) (err error) {
 	packet := &Packet{
 		Type:       message.GetType(),
@@ -34,7 +34,7 @@ func (p *Peer) WriteP2PMessage(message Message) (err error) {
 
 // SendGoAway send go away message to peer
 func (p *Peer) SendGoAway(reason GoAwayReason) error {
-	p2pLog.Debug("SendGoAway", zap.String("reson", reason.String()))
+	p2pLog.Debug("SendGoAway", zap.String("reason", reason.String()))
 
 	return errors.WithStack(p.WriteP2PMessage(&GoAwayMessage{
 		Reason: reason,
