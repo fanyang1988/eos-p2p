@@ -26,17 +26,22 @@ type peerStatus struct {
 
 // Client a p2p Client for eos chain
 type Client struct {
-	ps          map[string]*peerStatus
-	handlers    []Handler
-	readTimeout time.Duration
+	ps       map[string]*peerStatus
+	handlers []Handler
+
+	// for sync
+	syncHandler Handler
 	sync        *syncManager
-	chainID     Checksum256
+
+	chainID Checksum256
 
 	packetChan chan envelopMsg
 	peerChan   chan peerMsg
 
 	// TODO: client sync status should get from block forkdb
 	headBlockNum uint32
+
+	readTimeout time.Duration
 
 	wg sync.WaitGroup
 }
@@ -103,7 +108,7 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 	}
 
 	// init handlers no need keep sync
-	client.handlers = append(client.handlers, NewMsgHandler("sync", client.sync))
+	client.syncHandler = NewMsgHandler("sync", client.sync)
 	for _, h := range defaultOpts.handlers {
 		client.handlers = append(client.handlers, h)
 	}

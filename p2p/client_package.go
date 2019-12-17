@@ -112,6 +112,7 @@ func (c *Client) peerLoop(ctx context.Context) {
 				}
 			case envelopMsgPacket:
 				envelope := newEnvelope(r.Sender, r.Packet)
+				c.syncHandler.Handle(envelope)
 				for _, handle := range c.handlers {
 					handle.Handle(envelope)
 				}
