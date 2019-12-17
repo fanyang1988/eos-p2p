@@ -159,8 +159,9 @@ func (c *Client) peerMngLoop(ctx context.Context) {
 				case peerMsgErrPeer:
 					if p.err != nil {
 						p2pLog.Info("reconnect peer", zap.String("addr", p.peer.Address))
-						c.StartPeer(ctx, p.peer)
-						time.Sleep(3 * time.Second)
+						if err := c.StartPeer(ctx, p.peer); err != nil {
+							time.Sleep(3 * time.Second)
+						}
 					}
 				}
 			}
@@ -244,7 +245,7 @@ func (c *Client) Wait() {
 }
 
 // StartPeer start a peer r/w
-func (c *Client) StartPeer(ctx context.Context, p *Peer) {
+func (c *Client) StartPeer(ctx context.Context, p *Peer) error {
 	p2pLog.Info("Start Connect Peer", zap.String("peer", p.Address))
 	err := p.Start(ctx, c)
 	if err != nil {
@@ -253,7 +254,9 @@ func (c *Client) StartPeer(ctx context.Context, p *Peer) {
 			peer:   p,
 			msgTyp: peerMsgErrPeer,
 		}
+
+		return err
 	}
 
-	return
+	return nil
 }
