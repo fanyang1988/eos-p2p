@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -61,13 +62,17 @@ func main() {
 		peersCfg,
 		//p2p.WithNeedSync(1),
 		p2p.WithHandler(p2p.StringLoggerHandler),
-		p2p.WithHandler(p2p.NewMsgHandler(&MsgHandler{})),
+		p2p.WithHandler(p2p.NewMsgHandler("tmpHandler", &MsgHandler{})),
 	)
 
 	if err != nil {
 		Logger.Error("new client error", zap.Error(err))
 		return
 	}
+
+	time.Sleep(5 * time.Second)
+
+	client.DelPeerByAddress("localhost:9003")
 
 	waitClose()
 

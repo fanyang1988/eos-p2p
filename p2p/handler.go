@@ -2,6 +2,8 @@ package p2p
 
 import (
 	"encoding/json"
+	"fmt"
+	"reflect"
 
 	"go.uber.org/zap"
 )
@@ -9,6 +11,7 @@ import (
 // Handler interface for peer
 type Handler interface {
 	Handle(envelope *Envelope)
+	Name() string
 }
 
 // HandlerFunc a func for Handler
@@ -19,8 +22,37 @@ func (f HandlerFunc) Handle(envelope *Envelope) {
 	f(envelope)
 }
 
+// Name imp handle
+func (f HandlerFunc) Name() string {
+	return fmt.Sprintf("handlerByFunc[%s]", reflect.TypeOf(f).Name())
+}
+
+// handlerFuncWithName a func for Handler with a name
+type handlerFuncWithName struct {
+	f    HandlerFunc
+	name string
+}
+
+// NewHandlerFunc create a handler func with name
+func NewHandlerFunc(name string, f HandlerFunc) Handler {
+	return &handlerFuncWithName{
+		f:    f,
+		name: name,
+	}
+}
+
+// Handle imp handle
+func (f handlerFuncWithName) Handle(envelope *Envelope) {
+	f.f(envelope)
+}
+
+// Name imp handle
+func (f handlerFuncWithName) Name() string {
+	return f.name
+}
+
 // LoggerHandler logs the messages back and forth.
-var LoggerHandler = HandlerFunc(func(envelope *Envelope) {
+var LoggerHandler = NewHandlerFunc("logger", func(envelope *Envelope) {
 	data, err := json.Marshal(envelope)
 	if err != nil {
 		logErr("Marshal err", err)
@@ -31,7 +63,7 @@ var LoggerHandler = HandlerFunc(func(envelope *Envelope) {
 })
 
 // StringLoggerHandler simply prints the messages as they go through the client.
-var StringLoggerHandler = HandlerFunc(func(envelope *Envelope) {
+var StringLoggerHandler = NewHandlerFunc("stringLogger", func(envelope *Envelope) {
 	name, _ := envelope.Packet.Type.Name()
 	p2pLog.Info(
 		"handler Packet",
@@ -53,20 +85,27 @@ type MsgHandler interface {
 	OnPackedTransactionMsg(peer *Peer, msg *PackedTransactionMessage)
 }
 
-// MsgHandlerImp MsgHandler for p2p msg
-type MsgHandlerImp struct {
+// msgHandlerImp MsgHandler for p2p msg
+type msgHandlerImp struct {
 	handler MsgHandler
+	name    string
 }
 
 // NewMsgHandler create a msg Handler by MsgHandler
-func NewMsgHandler(handler MsgHandler) *MsgHandlerImp {
-	return &MsgHandlerImp{
+func NewMsgHandler(name string, handler MsgHandler) Handler {
+	return &msgHandlerImp{
 		handler: handler,
+		name:    name,
 	}
 }
 
+// Name implements Handler interface
+func (m msgHandlerImp) Name() string {
+	return m.name
+}
+
 // Handle implements Handler interface
-func (m MsgHandlerImp) Handle(envelope *Envelope) {
+func (m msgHandlerImp) Handle(envelope *Envelope) {
 	switch envelope.Packet.P2PMessage.(type) {
 	case *HandshakeMessage:
 		handshakeMessage, ok := envelope.Packet.P2PMessage.(*HandshakeMessage)
