@@ -28,7 +28,7 @@ type peerStatus struct {
 
 // Client a p2p Client for eos chain
 type Client struct {
-	ps          []peerStatus
+	ps          map[string]peerStatus
 	handlers    []Handler
 	readTimeout time.Duration
 	sync        *syncManager
@@ -82,7 +82,7 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 		}
 	}
 
-	ps := make([]peerStatus, 0, 64)
+	ps := make(map[string]peerStatus, 64)
 
 	for _, p := range peers {
 		peer, err := NewPeer(p, defaultOpts.startBlockNum, chainID)
@@ -90,11 +90,11 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 			return nil, errors.Wrapf(err, "new peer error")
 		}
 
-		ps = append(ps, peerStatus{
+		ps[peer.Address] = peerStatus{
 			peer:   peer,
 			status: peerStatInited,
 			cfg:    p,
-		})
+		}
 	}
 
 	client := &Client{
@@ -137,40 +137,6 @@ func (c *Client) closeAllPeer() {
 
 	for _, p := range c.ps {
 		p.peer.Wait()
-	}
-}
-
-func (c *Client) peerMngLoop(ctx context.Context) {
-	for {
-		select {
-		case p := <-c.peerChan:
-			// if already stop loop so close directly
-			select {
-			case <-ctx.Done():
-				p2pLog.Info("close peer chan mng")
-				return
-			default:
-			}
-
-			if p.peer != nil {
-				switch p.msgTyp {
-				case peerMsgNewPeer:
-				case peerMsgDelPeer:
-				case peerMsgErrPeer:
-					if p.err != nil {
-						p2pLog.Info("reconnect peer", zap.String("addr", p.peer.Address))
-						if err := c.StartPeer(ctx, p.peer); err != nil {
-							time.Sleep(3 * time.Second)
-						}
-					}
-				}
-			}
-
-		case <-ctx.Done():
-			// no need wait all msg in chan processed
-			p2pLog.Info("close peer chan mng")
-			return
-		}
 	}
 }
 
@@ -242,21 +208,4 @@ func (c *Client) Start(ctx context.Context) error {
 // Wait wait client closed
 func (c *Client) Wait() {
 	c.wg.Wait()
-}
-
-// StartPeer start a peer r/w
-func (c *Client) StartPeer(ctx context.Context, p *Peer) error {
-	p2pLog.Info("Start Connect Peer", zap.String("peer", p.Address))
-	err := p.Start(ctx, c)
-	if err != nil {
-		c.peerChan <- peerMsg{
-			err:    errors.Wrap(err, "connect error"),
-			peer:   p,
-			msgTyp: peerMsgErrPeer,
-		}
-
-		return err
-	}
-
-	return nil
 }
