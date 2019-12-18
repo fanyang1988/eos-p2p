@@ -95,11 +95,7 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 	}
 
 	client := &Client{
-		ps: make(map[string]*peerStatus, 64),
-		sync: &syncManager{
-			IsSyncAll: defaultOpts.needSync,
-			headBlock: defaultOpts.startBlockNum,
-		},
+		ps:           make(map[string]*peerStatus, 64),
 		packetChan:   make(chan envelopMsg, 256),
 		peerChan:     make(chan peerMsg, 8),
 		handlers:     make([]Handler, 0, len(defaultOpts.handlers)+1+32),
@@ -107,8 +103,13 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 		headBlockNum: defaultOpts.startBlockNum,
 	}
 
-	// init handlers no need keep sync
-	client.syncHandler = NewMsgHandler("sync", client.sync)
+	// create sync manager
+	client.sync = &syncManager{
+		cli: client,
+	}
+	client.sync.init(defaultOpts.needSync)
+
+	// init handlers
 	for _, h := range defaultOpts.handlers {
 		client.handlers = append(client.handlers, h)
 	}

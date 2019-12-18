@@ -13,54 +13,34 @@ const (
 )
 
 type syncManager struct {
-	IsSyncAll           bool
-	IsCatchingUp        bool
-	requestedStartBlock uint32
-	requestedEndBlock   uint32
-	headBlock           uint32
-	originHeadBlock     uint32
+	syncHandler syncHandlerInterface
+	cli         *Client
 }
 
-func (s *syncManager) sendSyncRequest(peer *Peer) error {
-	s.IsCatchingUp = true
+type syncHandlerInterface interface {
+	OnRequestMsg(peer *Peer, msg *RequestMessage) error
+	OnSyncRequestMsg(peer *Peer, msg *SyncRequestMessage) error
+	OnHandshakeMsg(peer *Peer, msg *HandshakeMessage) error
+	OnNoticeMsg(peer *Peer, msg *NoticeMessage) error
+	OnSignedBlock(peer *Peer, msg *SignedBlock) error
+}
 
-	delta := s.originHeadBlock - s.headBlock
-
-	s.requestedStartBlock = s.headBlock
-	s.requestedEndBlock = s.headBlock + uint32(math.Min(float64(delta), float64(BlockNumPerRequest)))
-
-	p2pLog.Debug("Sending sync request",
-		zap.Uint32("startBlock", s.requestedStartBlock),
-		zap.Uint32("endBlock", s.requestedEndBlock))
-
-	err := peer.SendSyncRequest(s.requestedStartBlock, s.requestedEndBlock+1)
-	if err != nil {
-		return errors.Wrapf(err, "send sync request to %s", peer.Address)
+func (s *syncManager) init(isSyncIrr bool) {
+	if isSyncIrr {
+		s.syncHandler = &syncIrreversibleHandler{
+			headBlock: s.cli.HeadBlockNum(),
+		}
+	} else {
+		s.syncHandler = &syncNoIrrHandler{}
 	}
 
-	return nil
+	s.cli.syncHandler = NewMsgHandler("sync", s)
 }
 
 // OnHandshakeMsg handler func imp
 func (s *syncManager) OnHandshakeMsg(peer *Peer, msg *HandshakeMessage) {
-	if s.IsSyncAll {
-		s.originHeadBlock = msg.HeadNum
-		err := s.sendSyncRequest(peer)
-		if err != nil {
-			//errChannel <- errors.Wrap(err, "handshake: sending sync request")
-			peer.ClosePeer()
-		}
-		s.IsCatchingUp = true
-	} else {
-		msg.NodeID = peer.NodeID
-		msg.P2PAddress = peer.Name
-		err := peer.WriteP2PMessage(msg)
-		if err != nil {
-			peer.Close(goAwayNoReason)
-			return
-		}
-		p2pLog.Debug("Handshake resent", zap.String("other", msg.P2PAddress))
-
+	if err := s.syncHandler.OnHandshakeMsg(peer, msg); err != nil {
+		p2pLog.Error("on handshake msg error", zap.Error(err))
 	}
 }
 
@@ -72,23 +52,13 @@ func (s *syncManager) OnGoAwayMsg(peer *Peer, msg *GoAwayMessage) {
 
 // OnTimeMsg handler func imp
 func (s *syncManager) OnTimeMsg(peer *Peer, msg *TimeMessage) {
-	if err := peer.SendTime(msg); err != nil {
-		p2pLog.Warn("send time msg to peer err", zap.Error(err))
-	}
+	peer.SendTime(msg)
 }
 
 // OnNoticeMsg handler func imp
 func (s *syncManager) OnNoticeMsg(peer *Peer, msg *NoticeMessage) {
-	if s.IsSyncAll {
-		pendingNum := msg.KnownBlocks.Pending
-		if pendingNum > 0 {
-			s.originHeadBlock = pendingNum
-			err := s.sendSyncRequest(peer)
-			if err != nil {
-				//errChannel <- errors.Wrap(err, "noticeMessage: sending sync request")
-				peer.ClosePeer()
-			}
-		}
+	if err := s.syncHandler.OnNoticeMsg(peer, msg); err != nil {
+		p2pLog.Error("on notice msg error", zap.Error(err))
 	}
 }
 
@@ -104,50 +74,129 @@ func (s *syncManager) OnSyncRequestMsg(peer *Peer, msg *SyncRequestMessage) {
 
 // OnSignedBlock handler func imp
 func (s *syncManager) OnSignedBlock(peer *Peer, msg *SignedBlock) {
-	if s.IsSyncAll {
-		blockNum := msg.BlockNumber()
-		s.headBlock = blockNum
-
-		if s.requestedEndBlock != blockNum {
-			// need to get more blocks
-			return
-		}
-
-		if s.originHeadBlock <= blockNum {
-			// now block have got all
-			p2pLog.Debug("In sync with last handshake")
-			blockID, err := msg.BlockID()
-			if err != nil {
-				//errChannel <- errors.Wrap(err, "getting block id")
-				peer.Close(goAwayValidation)
-				return
-			}
-			peer.handshakeInfo.HeadBlockNum = blockNum
-			peer.handshakeInfo.HeadBlockID = blockID
-			peer.handshakeInfo.HeadBlockTime = msg.SignedBlockHeader.Timestamp.Time
-
-			p2pLog.Debug("have sync all blocks needed",
-				zap.Uint32("to", blockNum))
-
-			err = peer.SendHandshake(peer.handshakeInfo)
-			if err != nil {
-				//errChannel <- errors.Wrap(err, "send handshake")
-				peer.ClosePeer()
-			}
-			p2pLog.Debug("Send new handshake", zap.Object("handshakeInfo", peer.handshakeInfo))
-		} else {
-			// need get next blocks by sync
-			err := s.sendSyncRequest(peer)
-			if err != nil {
-				//errChannel <- errors.Wrap(err, "signed block: sending sync request")
-				peer.ClosePeer()
-			}
-
-		}
+	if err := s.syncHandler.OnSignedBlock(peer, msg); err != nil {
+		p2pLog.Error("on block msg error", zap.Error(err))
 	}
 }
 
 // OnPackedTransactionMsg handler func imp
 func (s *syncManager) OnPackedTransactionMsg(peer *Peer, msg *PackedTransactionMessage) {
 	// do nothing
+}
+
+// syncIrreversibleHandler handler for syncManager when client is sync irreversible
+type syncIrreversibleHandler struct {
+	requestedStartBlock uint32
+	requestedEndBlock   uint32
+	headBlock           uint32
+	originHeadBlock     uint32
+}
+
+// No need imp
+func (h *syncIrreversibleHandler) OnRequestMsg(peer *Peer, msg *RequestMessage) error { return nil }
+func (h *syncIrreversibleHandler) OnSyncRequestMsg(peer *Peer, msg *SyncRequestMessage) error {
+	return nil
+}
+
+func (h *syncIrreversibleHandler) sendSyncRequest(peer *Peer) error {
+	// update sync status
+	delta := h.originHeadBlock - h.headBlock
+	h.requestedStartBlock = h.headBlock
+	h.requestedEndBlock = h.headBlock + uint32(math.Min(float64(delta), float64(BlockNumPerRequest)))
+
+	p2pLog.Debug("Sending sync request",
+		zap.Uint32("startBlock", h.requestedStartBlock),
+		zap.Uint32("endBlock", h.requestedEndBlock))
+
+	// send req
+	err := peer.SendSyncRequest(h.requestedStartBlock, h.requestedEndBlock+1)
+	if err != nil {
+		return errors.Wrapf(err, "send sync request to %s", peer.Address)
+	}
+
+	return nil
+}
+
+// OnHandshakeMsg when need sync irreversible blocks, after handshake client need send req to peer
+func (h *syncIrreversibleHandler) OnHandshakeMsg(peer *Peer, msg *HandshakeMessage) error {
+	// init sync status
+	h.originHeadBlock = msg.HeadNum
+	return h.sendSyncRequest(peer)
+}
+
+// OnNoticeMsg
+func (h *syncIrreversibleHandler) OnNoticeMsg(peer *Peer, msg *NoticeMessage) error {
+	pendingNum := msg.KnownBlocks.Pending
+	if pendingNum > 0 {
+		h.originHeadBlock = pendingNum
+		return h.sendSyncRequest(peer)
+	}
+	return nil
+}
+
+// OnSignedBlock handler func imp
+func (h *syncIrreversibleHandler) OnSignedBlock(peer *Peer, msg *SignedBlock) error {
+	blockNum := msg.BlockNumber()
+
+	// TODO: need push block getted to forkDB
+	h.headBlock = blockNum
+
+	// update sync status
+	if h.requestedEndBlock != blockNum {
+		// need to get more blocks, no need process new request in next
+		return nil
+	}
+
+	if h.originHeadBlock <= blockNum {
+		// now block have got all
+		p2pLog.Debug("In sync with last handshake", zap.Uint32("originHead", h.originHeadBlock))
+		blockID, err := msg.BlockID()
+		if err != nil {
+			return errors.Wrapf(err, "blockID error")
+		}
+
+		// update peer handshakeInfo, TODO: need get data from forkDB
+		peer.handshakeInfo.HeadBlockNum = blockNum
+		peer.handshakeInfo.HeadBlockID = blockID
+		peer.handshakeInfo.HeadBlockTime = msg.SignedBlockHeader.Timestamp.Time
+
+		p2pLog.Debug("have sync all blocks needed", zap.Uint32("to", blockNum))
+
+		// send new handshake to start a new sync
+		return peer.SendHandshake(peer.handshakeInfo)
+	}
+
+	// need get next blocks by sync
+	return h.sendSyncRequest(peer)
+
+}
+
+// syncNoIrrHandler handler for syncManager when client is sync blocks and trxs
+type syncNoIrrHandler struct {
+}
+
+// No need imp
+func (h *syncNoIrrHandler) OnRequestMsg(peer *Peer, msg *RequestMessage) error         { return nil }
+func (h *syncNoIrrHandler) OnSyncRequestMsg(peer *Peer, msg *SyncRequestMessage) error { return nil }
+
+// OnHandshakeMsg
+func (h *syncNoIrrHandler) OnHandshakeMsg(peer *Peer, msg *HandshakeMessage) error {
+	msg.NodeID = peer.NodeID
+	msg.P2PAddress = peer.Name
+
+	// TODO: use status from forkDB
+
+	return peer.WriteP2PMessage(msg)
+}
+
+// OnNoticeMsg
+func (h *syncNoIrrHandler) OnNoticeMsg(peer *Peer, msg *NoticeMessage) error {
+	// TODO: can sync to other
+	return nil
+}
+
+// OnSignedBlock handler func imp
+func (h *syncNoIrrHandler) OnSignedBlock(peer *Peer, msg *SignedBlock) error {
+	// TODO: to forkDB
+	return nil
 }
