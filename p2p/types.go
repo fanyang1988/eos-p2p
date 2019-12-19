@@ -6,8 +6,8 @@ import (
 	"io"
 	"net"
 
-	eos "github.com/eoscanada/eos-go"
-	"github.com/eoscanada/eos-go/ecc"
+	eos "github.com/eosforce/goeosforce"
+	"github.com/eosforce/goeosforce/ecc"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
