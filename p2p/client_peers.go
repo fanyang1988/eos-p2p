@@ -22,6 +22,7 @@ const (
 	peerMsgNewPeer = peerMsgTyp(iota)
 	peerMsgDelPeer
 	peerMsgErrPeer
+	peerSyncFinished
 )
 
 func (c *Client) peerMngLoop(ctx context.Context) {
@@ -43,6 +44,8 @@ func (c *Client) peerMngLoop(ctx context.Context) {
 				c.onDelPeer(ctx, &p)
 			case peerMsgErrPeer:
 				c.onErrPeer(ctx, &p)
+			case peerSyncFinished:
+				c.onSyncFinished(ctx, &p)
 			}
 
 		case <-ctx.Done():
@@ -136,6 +139,12 @@ func (c *Client) StartPeer(ctx context.Context, p *Peer) error {
 	}
 
 	ps.status = peerStatNormal
+
+	// use first peer connected to sync
+	if c.needSync && c.currentSyncPeer == nil {
+		c.startSyncIrr(p)
+		c.currentSyncPeer = p
+	}
 
 	return nil
 }

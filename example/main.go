@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -14,7 +13,7 @@ import (
 )
 
 var peer = flag.String("peer", "localhost:9000", "peer to connect to")
-var chainID = flag.String("chain-id", "1b85dedb0a11a73443f1baa1667499b2329283d516b368698a7f2e16bc3a3232", "net chainID to connect to")
+var chainID = flag.String("chain-id", "76eab2b704733e933d0e4eb6cc24d260d9fbbe5d93d760392e97398f4e301448", "net chainID to connect to")
 var showLog = flag.Bool("v", true, "show detail log")
 
 // waitClose wait for term signal, then stop the server
@@ -40,7 +39,6 @@ func main() {
 	ctx, cf := context.WithCancel(context.Background())
 
 	peers := []string{
-		"localhost:9000",
 		"localhost:9001",
 		"localhost:9002",
 		"localhost:9003",
@@ -55,12 +53,12 @@ func main() {
 		})
 	}
 
-	Logger.Info("P2P Client ", zap.String("peer", *peer), zap.String("chainID", *chainID))
+	//Logger.Info("P2P Client ", zap.String("peer", *peer), zap.String("chainID", *chainID))
 	client, err := p2p.NewClient(
 		ctx,
 		*chainID,
 		peersCfg,
-		//p2p.WithNeedSync(1),
+		p2p.WithNeedSync(1),
 		p2p.WithHandler(p2p.StringLoggerHandler),
 		p2p.WithHandler(p2p.NewMsgHandler("tmpHandler", &MsgHandler{})),
 	)
@@ -69,10 +67,6 @@ func main() {
 		Logger.Error("new client error", zap.Error(err))
 		return
 	}
-
-	time.Sleep(5 * time.Second)
-
-	client.DelPeerByAddress("localhost:9003")
 
 	waitClose()
 

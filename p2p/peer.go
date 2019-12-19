@@ -24,7 +24,6 @@ type Peer struct {
 	NodeID            []byte
 	connection        net.Conn
 	reader            io.Reader
-	handshakeInfo     *HandshakeInfo
 	readTimeout       time.Duration // TODO: no use this
 	connectionTimeout time.Duration
 	cli               *Client
@@ -42,7 +41,7 @@ func (p *Peer) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("name", p.Name)
 	enc.AddString("address", p.Address)
 	enc.AddString("agent", p.agent)
-	return enc.AddObject("handshakeInfo", p.handshakeInfo)
+	return nil
 }
 
 // HandshakeInfo handshake state for peer
@@ -87,14 +86,10 @@ func NewPeer(cfg *PeerCfg, headBlockNum uint32, chainID Checksum256) (*Peer, err
 	}
 
 	res := &Peer{
-		NodeID:  nodeID,
-		Address: cfg.Address,
-		agent:   name,
-		Name:    name,
-		handshakeInfo: &HandshakeInfo{
-			ChainID:      chainID,
-			HeadBlockNum: headBlockNum,
-		},
+		NodeID:            nodeID,
+		Address:           cfg.Address,
+		agent:             name,
+		Name:              name,
 		connectionTimeout: 5 * time.Second,
 		wg:                &sync.WaitGroup{},
 	}
@@ -138,13 +133,6 @@ func (p *Peer) Start(ctx context.Context, client *Client) error {
 	err := p.connect()
 	if err != nil {
 		return err
-	}
-
-	if p.handshakeInfo != nil {
-		//err := p.SendHandshake(p.handshakeInfo)
-		//if err != nil {
-		//	return errors.Wrap(err, "connect and start: trigger handshake")
-		//}
 	}
 
 	go func() {

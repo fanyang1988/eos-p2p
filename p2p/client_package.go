@@ -16,13 +16,15 @@ const (
 	envelopMsgDelHandler
 	envelopMsgError
 	envelopMsgPacket
+	envelopMsgStartSync
+	envelopMsgSyncSuccess
 )
 
 type envelopMsg struct {
+	typ     envelopMsgTyp
 	Sender  *Peer
 	Packet  *Packet
 	handler Handler
-	typ     envelopMsgTyp
 	err     error
 }
 
@@ -56,6 +58,7 @@ func newHandlerDelMsg(h Handler) envelopMsg {
 	}
 }
 
+// peerLoop all packet from peers will process by there
 func (c *Client) peerLoop(ctx context.Context) {
 	isStopped := false
 	for {
@@ -71,6 +74,8 @@ func (c *Client) peerLoop(ctx context.Context) {
 				c.onAddHandlerMsg(&r)
 			case envelopMsgDelHandler:
 				c.onDelHandlerMsg(&r)
+			case envelopMsgStartSync:
+				c.onStartSyncIrreversible(r.Sender)
 			case envelopMsgError:
 				if !isStopped {
 					c.onPeerErrorMsg(&r)

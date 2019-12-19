@@ -30,8 +30,10 @@ type Client struct {
 	handlers []Handler
 
 	// for sync
-	syncHandler Handler
-	sync        *syncManager
+	syncHandler     Handler
+	sync            *syncManager
+	currentSyncPeer *Peer // will changed by peerMng loop
+	needSync        bool
 
 	chainID Checksum256
 
@@ -40,6 +42,8 @@ type Client struct {
 
 	// TODO: client sync status should get from block forkDB
 	headBlockNum uint32
+	headBlock    *SignedBlock
+	dataMutex    sync.RWMutex
 
 	readTimeout time.Duration
 
@@ -101,6 +105,7 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 		handlers:     make([]Handler, 0, len(defaultOpts.handlers)+1+32),
 		chainID:      cID,
 		headBlockNum: defaultOpts.startBlockNum,
+		needSync:     defaultOpts.needSync,
 	}
 
 	// create sync manager
@@ -170,7 +175,29 @@ func (c *Client) ChainID() Checksum256 {
 	return c.chainID
 }
 
+// HeadBlock get head block number current
+func (c *Client) HeadBlock() (uint32, *SignedBlock) {
+	c.dataMutex.RLock()
+	defer c.dataMutex.RUnlock()
+	return c.headBlockNum, c.headBlock // TODO: need from forkDB, now is const to 1
+}
+
 // HeadBlockNum get head block number current
 func (c *Client) HeadBlockNum() uint32 {
+	c.dataMutex.RLock()
+	defer c.dataMutex.RUnlock()
 	return c.headBlockNum // TODO: need from forkDB, now is const to 1
+}
+
+// SetHeadBlock set head block number current
+func (c *Client) SetHeadBlock(blk *SignedBlock) {
+	c.dataMutex.Lock()
+	c.dataMutex.Unlock()
+
+	// TODO: need set to forkDB, now is Just a test
+	num := blk.BlockNumber()
+	if num > c.headBlockNum {
+		c.headBlockNum = num
+		c.headBlock = blk
+	}
 }

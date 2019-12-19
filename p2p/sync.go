@@ -27,11 +27,15 @@ type syncHandlerInterface interface {
 
 func (s *syncManager) init(isSyncIrr bool) {
 	if isSyncIrr {
+		bn, _ := s.cli.HeadBlock()
 		s.syncHandler = &syncIrreversibleHandler{
-			headBlock: s.cli.HeadBlockNum(),
+			headBlock: bn,
+			cli:       s.cli,
 		}
 	} else {
-		s.syncHandler = &syncNoIrrHandler{}
+		s.syncHandler = &syncNoIrrHandler{
+			cli: s.cli,
+		}
 	}
 
 	s.cli.syncHandler = NewMsgHandler("sync", s)
@@ -90,6 +94,7 @@ type syncIrreversibleHandler struct {
 	requestedEndBlock   uint32
 	headBlock           uint32
 	originHeadBlock     uint32
+	cli                 *Client
 }
 
 // No need imp
@@ -140,6 +145,7 @@ func (h *syncIrreversibleHandler) OnSignedBlock(peer *Peer, msg *SignedBlock) er
 
 	// TODO: need push block getted to forkDB
 	h.headBlock = blockNum
+	h.cli.SetHeadBlock(msg)
 
 	// update sync status
 	if h.requestedEndBlock != blockNum {
@@ -149,21 +155,14 @@ func (h *syncIrreversibleHandler) OnSignedBlock(peer *Peer, msg *SignedBlock) er
 
 	if h.originHeadBlock <= blockNum {
 		// now block have got all
-		p2pLog.Debug("In sync with last handshake", zap.Uint32("originHead", h.originHeadBlock))
-		blockID, err := msg.BlockID()
-		if err != nil {
-			return errors.Wrapf(err, "blockID error")
-		}
 
-		// update peer handshakeInfo, TODO: need get data from forkDB
-		peer.handshakeInfo.HeadBlockNum = blockNum
-		peer.handshakeInfo.HeadBlockID = blockID
-		peer.handshakeInfo.HeadBlockTime = msg.SignedBlockHeader.Timestamp.Time
+		p2pLog.Debug("have sync all blocks needed",
+			zap.Uint32("originHead", h.originHeadBlock),
+			zap.Uint32("to", blockNum))
 
-		p2pLog.Debug("have sync all blocks needed", zap.Uint32("to", blockNum))
+		h.cli.syncSuccessNotice(peer)
 
-		// send new handshake to start a new sync
-		return peer.SendHandshake(peer.handshakeInfo)
+		return nil
 	}
 
 	// need get next blocks by sync
@@ -173,6 +172,7 @@ func (h *syncIrreversibleHandler) OnSignedBlock(peer *Peer, msg *SignedBlock) er
 
 // syncNoIrrHandler handler for syncManager when client is sync blocks and trxs
 type syncNoIrrHandler struct {
+	cli *Client
 }
 
 // No need imp
@@ -198,5 +198,6 @@ func (h *syncNoIrrHandler) OnNoticeMsg(peer *Peer, msg *NoticeMessage) error {
 // OnSignedBlock handler func imp
 func (h *syncNoIrrHandler) OnSignedBlock(peer *Peer, msg *SignedBlock) error {
 	// TODO: to forkDB
+	h.cli.SetHeadBlock(msg)
 	return nil
 }
