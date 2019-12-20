@@ -7,6 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+
+	"github.com/fanyang1988/eos-p2p/types"
 )
 
 // WriteP2PMessage write a p2p msg to peer
@@ -18,7 +20,7 @@ func (p *Peer) WriteP2PMessage(message Message) (err error) {
 
 	buff := bytes.NewBuffer(make([]byte, 0, 512))
 
-	encoder := newEOSEncoder(buff, p.connection)
+	encoder := types.NewChainEncoder(buff)
 	err = encoder.Encode(packet)
 	if err != nil {
 		return errors.Wrapf(err, "unable to encode message %s", message)
@@ -119,7 +121,7 @@ func (p *Peer) SendTime(recv *TimeMessage) error {
 // SendHandshake send handshake msg to peer
 func (p *Peer) SendHandshake(info *HandshakeInfo) error {
 
-	publicKey, err := newPublicKey("EOS1111111111111111111111111111111114T1Anm")
+	publicKey, err := types.NewPublicKey("EOS1111111111111111111111111111111114T1Anm")
 	if err != nil {
 		return errors.Wrapf(err, "sending handshake to %s: create public key", p.Address)
 	}
