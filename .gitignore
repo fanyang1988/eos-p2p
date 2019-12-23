@@ -4,3 +4,4 @@ example/example
 vendor
 
 *.log
+store/testblocks.db
