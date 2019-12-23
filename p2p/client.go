@@ -6,7 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fanyang1988/eos-p2p/store"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 type peerStatusTyp uint8
@@ -40,10 +42,7 @@ type Client struct {
 	packetChan chan envelopMsg
 	peerChan   chan peerMsg
 
-	// TODO: client sync status should get from block forkDB
-	headBlockNum uint32
-	headBlock    *SignedBlock
-	dataMutex    sync.RWMutex
+	blkStorer store.BlockStorer
 
 	readTimeout time.Duration
 
@@ -55,6 +54,7 @@ type Options struct {
 	needSync      bool
 	startBlockNum uint32
 	handlers      []Handler
+	blkStorer     store.BlockStorer
 }
 
 // OptionFunc func for new client
@@ -73,6 +73,14 @@ func WithNeedSync(startBlockNum uint32) OptionFunc {
 func WithHandler(h Handler) OptionFunc {
 	return func(o *Options) error {
 		o.handlers = append(o.handlers, h)
+		return nil
+	}
+}
+
+// WithStorer set storer for blocks and state
+func WithStorer(blk store.BlockStorer) OptionFunc {
+	return func(o *Options) error {
+		o.blkStorer = blk
 		return nil
 	}
 }
@@ -99,13 +107,13 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 	}
 
 	client := &Client{
-		ps:           make(map[string]*peerStatus, 64),
-		packetChan:   make(chan envelopMsg, 256),
-		peerChan:     make(chan peerMsg, 8),
-		handlers:     make([]Handler, 0, len(defaultOpts.handlers)+1+32),
-		chainID:      cID,
-		headBlockNum: defaultOpts.startBlockNum,
-		needSync:     defaultOpts.needSync,
+		ps:         make(map[string]*peerStatus, 64),
+		packetChan: make(chan envelopMsg, 256),
+		peerChan:   make(chan peerMsg, 8),
+		handlers:   make([]Handler, 0, len(defaultOpts.handlers)+1+32),
+		chainID:    cID,
+		needSync:   defaultOpts.needSync,
+		blkStorer:  defaultOpts.blkStorer,
 	}
 
 	// create sync manager
@@ -168,6 +176,8 @@ func (c *Client) Start(ctx context.Context) error {
 // Wait wait client closed
 func (c *Client) Wait() {
 	c.wg.Wait()
+	c.blkStorer.Close()
+	c.blkStorer.Wait()
 }
 
 // ChainID get chainID from the net client to connect
@@ -177,27 +187,23 @@ func (c *Client) ChainID() Checksum256 {
 
 // HeadBlock get head block number current
 func (c *Client) HeadBlock() (uint32, *SignedBlock) {
-	c.dataMutex.RLock()
-	defer c.dataMutex.RUnlock()
-	return c.headBlockNum, c.headBlock // TODO: need from forkDB, now is const to 1
+	blk := c.blkStorer.HeadBlock()
+	if blk == nil {
+		return 1, nil
+	}
+	return blk.BlockNumber(), blk
 }
 
 // HeadBlockNum get head block number current
 func (c *Client) HeadBlockNum() uint32 {
-	c.dataMutex.RLock()
-	defer c.dataMutex.RUnlock()
-	return c.headBlockNum // TODO: need from forkDB, now is const to 1
+	return c.blkStorer.HeadBlockNum()
 }
 
 // SetHeadBlock set head block number current
 func (c *Client) SetHeadBlock(blk *SignedBlock) {
-	c.dataMutex.Lock()
-	c.dataMutex.Unlock()
-
-	// TODO: need set to forkDB, now is Just a test
-	num := blk.BlockNumber()
-	if num > c.headBlockNum {
-		c.headBlockNum = num
-		c.headBlock = blk
+	// TODO: process error
+	err := c.blkStorer.CommitBlock(blk)
+	if err != nil {
+		p2pLog.Error("set block error %s", zap.Error(err))
 	}
 }

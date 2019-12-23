@@ -15,9 +15,16 @@ import (
 // onStartSyncIrreversible start to sync all irreversible block by the peer
 func (c *Client) onStartSyncIrreversible(peer *Peer) {
 	p2pLog.Info("start sync all blocks", zap.String("addr", peer.Address))
+
+	stat := c.blkStorer.State()
+
 	peer.SendHandshake(&HandshakeInfo{
-		ChainID:      c.chainID,
-		HeadBlockNum: c.HeadBlockNum(),
+		ChainID:                  c.chainID,
+		HeadBlockNum:             stat.HeadBlockNum,
+		HeadBlockID:              stat.HeadBlockID,
+		HeadBlockTime:            stat.HeadBlockTime,
+		LastIrreversibleBlockNum: stat.LastIrreversibleBlockNum,
+		LastIrreversibleBlockID:  stat.LastIrreversibleBlockID,
 	})
 }
 
@@ -33,21 +40,19 @@ func (c *Client) startSyncIrr(peer *Peer) {
 func (c *Client) onSyncFinished(ctx context.Context, msg *peerMsg) {
 	p2pLog.Info("sync finished", zap.Uint32("current head", c.HeadBlockNum()))
 
-	num, blk := c.HeadBlock()
-
-	bID, _ := blk.BlockID()
+	stat := c.blkStorer.State()
 
 	for _, peerStat := range c.ps {
 		if peerStat.status != peerStatNormal {
 			continue
 		}
 		peerStat.peer.SendHandshake(&HandshakeInfo{
-			ChainID:       c.chainID,
-			HeadBlockNum:  num,
-			HeadBlockID:   bID,
-			HeadBlockTime: blk.Timestamp.Time,
-			//LastIrreversibleBlockNum uint32
-			//LastIrreversibleBlockID  Checksum256
+			ChainID:                  c.chainID,
+			HeadBlockNum:             stat.HeadBlockNum,
+			HeadBlockID:              stat.HeadBlockID,
+			HeadBlockTime:            stat.HeadBlockTime,
+			LastIrreversibleBlockNum: stat.LastIrreversibleBlockNum,
+			LastIrreversibleBlockID:  stat.LastIrreversibleBlockID,
 		})
 	}
 }

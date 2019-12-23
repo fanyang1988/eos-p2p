@@ -27,10 +27,8 @@ type syncHandlerInterface interface {
 
 func (s *syncManager) init(isSyncIrr bool) {
 	if isSyncIrr {
-		bn, _ := s.cli.HeadBlock()
 		s.syncHandler = &syncIrreversibleHandler{
-			headBlock: bn,
-			cli:       s.cli,
+			cli: s.cli,
 		}
 	} else {
 		s.syncHandler = &syncNoIrrHandler{
@@ -92,7 +90,6 @@ func (s *syncManager) OnPackedTransactionMsg(peer *Peer, msg *PackedTransactionM
 type syncIrreversibleHandler struct {
 	requestedStartBlock uint32
 	requestedEndBlock   uint32
-	headBlock           uint32
 	originHeadBlock     uint32
 	cli                 *Client
 }
@@ -105,9 +102,10 @@ func (h *syncIrreversibleHandler) OnSyncRequestMsg(peer *Peer, msg *SyncRequestM
 
 func (h *syncIrreversibleHandler) sendSyncRequest(peer *Peer) error {
 	// update sync status
-	delta := h.originHeadBlock - h.headBlock
-	h.requestedStartBlock = h.headBlock
-	h.requestedEndBlock = h.headBlock + uint32(math.Min(float64(delta), float64(BlockNumPerRequest)))
+	headBlockNum := h.cli.HeadBlockNum()
+	delta := h.originHeadBlock - headBlockNum
+	h.requestedStartBlock = headBlockNum
+	h.requestedEndBlock = headBlockNum + uint32(math.Min(float64(delta), float64(BlockNumPerRequest)))
 
 	p2pLog.Debug("Sending sync request",
 		zap.Uint32("startBlock", h.requestedStartBlock),
@@ -142,9 +140,6 @@ func (h *syncIrreversibleHandler) OnNoticeMsg(peer *Peer, msg *NoticeMessage) er
 // OnSignedBlock handler func imp
 func (h *syncIrreversibleHandler) OnSignedBlock(peer *Peer, msg *SignedBlock) error {
 	blockNum := msg.BlockNumber()
-
-	// TODO: need push block getted to forkDB
-	h.headBlock = blockNum
 	h.cli.SetHeadBlock(msg)
 
 	// update sync status

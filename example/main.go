@@ -10,9 +10,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/fanyang1988/eos-p2p/p2p"
+	"github.com/fanyang1988/eos-p2p/store"
 )
 
-var peer = flag.String("peer", "localhost:9000", "peer to connect to")
+var peer = flag.String("peer", "", "peer to connect to")
 var chainID = flag.String("chain-id", "76eab2b704733e933d0e4eb6cc24d260d9fbbe5d93d760392e97398f4e301448", "net chainID to connect to")
 var showLog = flag.Bool("v", true, "show detail log")
 
@@ -47,10 +48,23 @@ func main() {
 	}
 
 	peersCfg := make([]*p2p.PeerCfg, 0, len(peers))
-	for _, p := range peers {
+
+	if *peer != "" {
 		peersCfg = append(peersCfg, &p2p.PeerCfg{
-			Address: p,
+			Address: *peer,
 		})
+	} else {
+		for _, p := range peers {
+			peersCfg = append(peersCfg, &p2p.PeerCfg{
+				Address: p,
+			})
+		}
+	}
+
+	storer, err := store.NewBBoltStorer(Logger, *chainID, "./blocks.db")
+	if err != nil {
+		Logger.Error("new storer error", zap.Error(err))
+		return
 	}
 
 	//Logger.Info("P2P Client ", zap.String("peer", *peer), zap.String("chainID", *chainID))
@@ -59,7 +73,8 @@ func main() {
 		*chainID,
 		peersCfg,
 		p2p.WithNeedSync(1),
-		p2p.WithHandler(p2p.StringLoggerHandler),
+		p2p.WithStorer(storer),
+		//p2p.WithHandler(p2p.StringLoggerHandler),
 		p2p.WithHandler(p2p.NewMsgHandler("tmpHandler", &MsgHandler{})),
 	)
 
