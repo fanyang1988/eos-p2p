@@ -67,3 +67,18 @@ func readPacket(r io.Reader, conn net.Conn) (*Packet, error) {
 	packet.Raw = data
 	return packet, nil
 }
+
+// IsChecksumEq is two Checksum256 is same
+func IsChecksumEq(l Checksum256, r Checksum256) bool {
+	if len(l) != len(r) {
+		return false
+	}
+
+	for idx, c := range l {
+		if r[idx] != c {
+			return false
+		}
+	}
+
+	return true
+}

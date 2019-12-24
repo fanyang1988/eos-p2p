@@ -15,18 +15,19 @@ import (
 
 // BlockDBState head state and chain state
 type BlockDBState struct {
+	ChainID                  types.Checksum256  `json:"chainID"`
 	HeadBlockNum             uint32             `json:"headNum"`
 	HeadBlockID              types.Checksum256  `json:"headID"`
-	HeadBlockTime            time.Time          `json:"t"`
+	HeadBlockTime            time.Time          `json:"headTime"`
 	LastIrreversibleBlockNum uint32             `json:"irrNum"`
 	LastIrreversibleBlockID  types.Checksum256  `json:"irrID"`
 	HeadBlock                *types.SignedBlock `json:"blk"`
 }
 
 // ToHandshakeInfo make a handshake info for handshake message
-func (b *BlockDBState) ToHandshakeInfo(chainID types.Checksum256) *types.HandshakeInfo {
+func (b *BlockDBState) ToHandshakeInfo() *types.HandshakeInfo {
 	return &types.HandshakeInfo{
-		ChainID:                  chainID,
+		ChainID:                  b.ChainID,
 		HeadBlockNum:             b.HeadBlockNum,
 		HeadBlockID:              b.HeadBlockID,
 		HeadBlockTime:            b.HeadBlockTime,
@@ -36,8 +37,9 @@ func (b *BlockDBState) ToHandshakeInfo(chainID types.Checksum256) *types.Handsha
 }
 
 // NewBlockDBState new stat
-func NewBlockDBState() *BlockDBState {
+func NewBlockDBState(chainID types.Checksum256) *BlockDBState {
 	return &BlockDBState{
+		ChainID:      chainID,
 		HeadBlockNum: 1,
 	}
 }
@@ -79,17 +81,17 @@ func NewBBoltStorer(logger *zap.Logger, chainID string, dbPath string) (*BBoltSt
 		chainID: cID,
 		db:      db,
 		logger:  logger,
-		state:   NewBlockDBState(),
+		state:   NewBlockDBState(cID),
 	}
 
-	if err := res.initState(); err != nil {
+	if err := res.initState(cID); err != nil {
 		return nil, err
 	}
 
 	return res, nil
 }
 
-func (s *BBoltStorer) initState() error {
+func (s *BBoltStorer) initState(chainID types.Checksum256) error {
 	return errors.Wrap(s.db.Update(func(tx *bolt.Tx) error {
 		stateBucket, err := tx.CreateBucketIfNotExists([]byte("state"))
 		if err != nil {
@@ -113,6 +115,11 @@ func (s *BBoltStorer) initState() error {
 		} else {
 			if err := s.state.FromBytes(stateBytes); err != nil {
 				return errors.Wrap(err, "state from data")
+			}
+
+			if !types.IsChecksumEq(s.chainID, s.state.ChainID) {
+				return errors.Wrapf(err, "ChainID is diff in store, now: %s, store: %s",
+					s.chainID.String(), s.state.ChainID.String())
 			}
 		}
 

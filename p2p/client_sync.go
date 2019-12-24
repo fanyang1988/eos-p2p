@@ -16,7 +16,7 @@ import (
 func (c *Client) onStartSyncIrreversible(peer *Peer) {
 	p2pLog.Info("start sync all blocks", zap.String("addr", peer.Address))
 	stat := c.blkStorer.State()
-	h := stat.ToHandshakeInfo(c.ChainID())
+	h := stat.ToHandshakeInfo()
 	peer.SendHandshake(h)
 }
 
@@ -33,7 +33,7 @@ func (c *Client) onSyncFinished(ctx context.Context, msg *peerMsg) {
 	p2pLog.Info("sync finished", zap.Uint32("current head", c.HeadBlockNum()))
 
 	stat := c.blkStorer.State()
-	h := stat.ToHandshakeInfo(c.ChainID())
+	h := stat.ToHandshakeInfo()
 
 	for _, peerStat := range c.ps {
 		if peerStat.status != peerStatNormal {
