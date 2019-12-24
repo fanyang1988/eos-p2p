@@ -23,6 +23,18 @@ type BlockDBState struct {
 	HeadBlock                *types.SignedBlock `json:"blk"`
 }
 
+// ToHandshakeInfo make a handshake info for handshake message
+func (b *BlockDBState) ToHandshakeInfo(chainID types.Checksum256) *types.HandshakeInfo {
+	return &types.HandshakeInfo{
+		ChainID:                  chainID,
+		HeadBlockNum:             b.HeadBlockNum,
+		HeadBlockID:              b.HeadBlockID,
+		HeadBlockTime:            b.HeadBlockTime,
+		LastIrreversibleBlockNum: b.LastIrreversibleBlockNum,
+		LastIrreversibleBlockID:  b.LastIrreversibleBlockID,
+	}
+}
+
 // NewBlockDBState new stat
 func NewBlockDBState() *BlockDBState {
 	return &BlockDBState{

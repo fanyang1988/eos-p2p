@@ -6,9 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fanyang1988/eos-p2p/store"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+
+	"github.com/fanyang1988/eos-p2p/store"
 )
 
 type peerStatusTyp uint8
@@ -183,15 +184,6 @@ func (c *Client) Wait() {
 // ChainID get chainID from the net client to connect
 func (c *Client) ChainID() Checksum256 {
 	return c.chainID
-}
-
-// HeadBlock get head block number current
-func (c *Client) HeadBlock() (uint32, *SignedBlock) {
-	blk := c.blkStorer.HeadBlock()
-	if blk == nil {
-		return 1, nil
-	}
-	return blk.BlockNumber(), blk
 }
 
 // HeadBlockNum get head block number current
