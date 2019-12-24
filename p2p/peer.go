@@ -46,32 +46,6 @@ func (p *Peer) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-// HandshakeInfo handshake state for peer
-type HandshakeInfo struct {
-	ChainID                  Checksum256
-	HeadBlockNum             uint32
-	HeadBlockID              Checksum256
-	HeadBlockTime            time.Time
-	LastIrreversibleBlockNum uint32
-	LastIrreversibleBlockID  Checksum256
-}
-
-func (h *HandshakeInfo) String() string {
-	return fmt.Sprintf("Handshake Info: Head[%d], LastIrreversible[%d]",
-		h.HeadBlockNum, h.LastIrreversibleBlockNum)
-}
-
-// MarshalLogObject calls the underlying function from zap.
-func (h HandshakeInfo) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("chainID", h.ChainID.String())
-	enc.AddUint32("headBlockNum", h.HeadBlockNum)
-	enc.AddString("headBlockID", h.HeadBlockID.String())
-	enc.AddTime("headBlockTime", h.HeadBlockTime)
-	enc.AddUint32("lastIrreversibleBlockNum", h.LastIrreversibleBlockNum)
-	enc.AddString("lastIrreversibleBlockID", h.LastIrreversibleBlockID.String())
-	return nil
-}
-
 // NewPeer create a peer
 func NewPeer(cfg *PeerCfg, headBlockNum uint32, chainID Checksum256) (*Peer, error) {
 	nodeID := make([]byte, 32)

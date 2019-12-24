@@ -72,3 +72,6 @@ type Signature = types.Signature
 
 // PublicKey ecc types
 type PublicKey = types.PublicKey
+
+// HandshakeInfo handshake state for peer
+type HandshakeInfo = types.HandshakeInfo
