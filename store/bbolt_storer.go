@@ -61,12 +61,14 @@ type BBoltStorer struct {
 	logger  *zap.Logger
 	mutex   sync.RWMutex
 
+	isStoreAllBlocks bool
+
 	// current store state
 	state *BlockDBState
 }
 
 // NewBBoltStorer create a bbolt storer
-func NewBBoltStorer(logger *zap.Logger, chainID string, dbPath string) (*BBoltStorer, error) {
+func NewBBoltStorer(logger *zap.Logger, chainID string, dbPath string, isStoreBlocks bool) (*BBoltStorer, error) {
 	cID, err := hex.DecodeString(chainID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "decode chainID error")
@@ -78,10 +80,11 @@ func NewBBoltStorer(logger *zap.Logger, chainID string, dbPath string) (*BBoltSt
 	}
 
 	res := &BBoltStorer{
-		chainID: cID,
-		db:      db,
-		logger:  logger,
-		state:   NewBlockDBState(cID),
+		chainID:          cID,
+		db:               db,
+		logger:           logger,
+		isStoreAllBlocks: isStoreBlocks,
+		state:            NewBlockDBState(cID),
 	}
 
 	if err := res.initState(cID); err != nil {
@@ -185,6 +188,7 @@ func (s *BBoltStorer) updateStatByBlock(blk *types.SignedBlock) error {
 	s.state.HeadBlockTime = blk.Timestamp.Time
 	s.state.LastIrreversibleBlockNum = s.state.HeadBlockNum
 	s.state.LastIrreversibleBlockID = s.state.HeadBlockID
+	s.state.HeadBlock = blk
 
 	if s.state.HeadBlockNum%1000 == 0 {
 		s.logger.Info("on block head", zap.Uint32("blockNum", s.state.HeadBlockNum))
@@ -225,7 +229,11 @@ func (s *BBoltStorer) CommitBlock(blk *types.SignedBlock) error {
 		return err
 	}
 
-	return s.setBlock(blk)
+	if s.isStoreAllBlocks {
+		return s.setBlock(blk)
+	}
+
+	return nil
 }
 
 // CommitTrx commit trx

@@ -61,7 +61,7 @@ func main() {
 		}
 	}
 
-	storer, err := store.NewBBoltStorer(Logger, *chainID, "./blocks.db")
+	storer, err := store.NewBBoltStorer(Logger, *chainID, "./blocks.db", false)
 	if err != nil {
 		Logger.Error("new storer error", zap.Error(err))
 		return
