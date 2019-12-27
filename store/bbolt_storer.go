@@ -157,7 +157,12 @@ func (s *BBoltStorer) HeadBlock() *types.SignedBlock {
 	if s.state.HeadBlock == nil {
 		return nil
 	}
-	return s.state.HeadBlock // TODO: need deep copy
+
+	res, err := types.DeepCopyBlock(s.state.HeadBlock)
+	if err != nil {
+		s.logger.Error("deep copy error", zap.Error(err))
+	}
+	return res
 }
 
 // HeadBlockID get HeadBlockID

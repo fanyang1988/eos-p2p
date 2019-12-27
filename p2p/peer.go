@@ -26,7 +26,6 @@ type Peer struct {
 	NodeID            []byte
 	connection        net.Conn
 	reader            io.Reader
-	readTimeout       time.Duration // TODO: no use this
 	connectionTimeout time.Duration
 	cli               *Client
 	wg                *sync.WaitGroup

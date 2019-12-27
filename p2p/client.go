@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -44,8 +43,6 @@ type Client struct {
 	peerChan   chan peerMsg
 
 	blkStorer store.BlockStorer
-
-	readTimeout time.Duration
 
 	wg sync.WaitGroup
 }
@@ -140,11 +137,6 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 	return client, nil
 }
 
-// SetReadTimeout set conn io readtimeout
-func (c *Client) SetReadTimeout(readTimeout time.Duration) {
-	c.readTimeout = readTimeout
-}
-
 func (c *Client) closeAllPeer() {
 	for _, p := range c.ps {
 		p.peer.ClosePeer()
@@ -192,10 +184,11 @@ func (c *Client) HeadBlockNum() uint32 {
 }
 
 // SetHeadBlock set head block number current
-func (c *Client) SetHeadBlock(blk *SignedBlock) {
-	// TODO: process error
+func (c *Client) SetHeadBlock(blk *SignedBlock) error {
 	err := c.blkStorer.CommitBlock(blk)
 	if err != nil {
 		p2pLog.Error("set block error %s", zap.Error(err))
 	}
+
+	return errors.Wrapf(err, "set head block")
 }

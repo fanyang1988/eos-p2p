@@ -1,11 +1,13 @@
 package types
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
 	eos "github.com/eosforce/goeosforce"
 	"github.com/eosforce/goeosforce/ecc"
+	"github.com/pkg/errors"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -102,4 +104,26 @@ func (h HandshakeInfo) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddUint32("lastIrreversibleBlockNum", h.LastIrreversibleBlockNum)
 	enc.AddString("lastIrreversibleBlockID", h.LastIrreversibleBlockID.String())
 	return nil
+}
+
+// DeepCopyBlock a deep copy for a block
+func DeepCopyBlock(b *SignedBlock) (*SignedBlock, error) {
+	res := &SignedBlock{}
+
+	buffer := bytes.NewBuffer(make([]byte, 0, 128*1024))
+	encoder := eos.NewEncoder(buffer)
+
+	err := encoder.Encode(b)
+	if err != nil {
+		return nil, errors.Wrapf(err, "deep copy encode")
+	}
+
+	decoder := eos.NewDecoder(buffer.Bytes())
+	err = decoder.Decode(res)
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "deep copy decoder")
+	}
+
+	return res, nil
 }

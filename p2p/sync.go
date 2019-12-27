@@ -192,7 +192,6 @@ func (h *syncNoIrrHandler) OnNoticeMsg(peer *Peer, msg *NoticeMessage) error {
 
 // OnSignedBlock handler func imp
 func (h *syncNoIrrHandler) OnSignedBlock(peer *Peer, msg *SignedBlock) error {
-	// TODO: to forkDB
 	h.cli.SetHeadBlock(msg)
 	return nil
 }
