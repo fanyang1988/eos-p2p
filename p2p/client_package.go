@@ -65,7 +65,7 @@ func (c *Client) peerLoop(ctx context.Context) {
 		select {
 		case r, ok := <-c.packetChan:
 			if !ok {
-				p2pLog.Info("client peerLoop stop")
+				c.logger.Info("client peerLoop stop")
 				return
 			}
 
@@ -87,9 +87,9 @@ func (c *Client) peerLoop(ctx context.Context) {
 		case <-ctx.Done():
 			if !isStopped {
 				isStopped = true
-				p2pLog.Info("close p2p client")
+				c.logger.Info("close p2p client")
 				c.closeAllPeer()
-				p2pLog.Info("all peer is closed, to close client peerLoop")
+				c.logger.Info("all peer is closed, to close client peerLoop")
 				close(c.packetChan)
 			}
 		}
@@ -98,10 +98,10 @@ func (c *Client) peerLoop(ctx context.Context) {
 
 func (c *Client) onAddHandlerMsg(r *envelopMsg) {
 	handlerName := r.handler.Name()
-	p2pLog.Info("new handler", zap.String("name", handlerName))
+	c.logger.Info("new handler", zap.String("name", handlerName))
 	for idx, h := range c.handlers {
 		if h.Name() == handlerName {
-			p2pLog.Info("replace handler", zap.String("name", handlerName))
+			c.logger.Info("replace handler", zap.String("name", handlerName))
 			c.handlers[idx] = r.handler
 			return
 		}
@@ -111,7 +111,7 @@ func (c *Client) onAddHandlerMsg(r *envelopMsg) {
 
 func (c *Client) onDelHandlerMsg(r *envelopMsg) {
 	handlerName := r.handler.Name()
-	p2pLog.Info("del handler", zap.String("name", handlerName))
+	c.logger.Info("del handler", zap.String("name", handlerName))
 	for idx, h := range c.handlers {
 		if h.Name() == handlerName {
 			// not change seq with handlers
@@ -122,7 +122,7 @@ func (c *Client) onDelHandlerMsg(r *envelopMsg) {
 			return
 		}
 	}
-	p2pLog.Warn("no found hander to del", zap.String("name", handlerName))
+	c.logger.Warn("no found hander to del", zap.String("name", handlerName))
 }
 
 func (c *Client) onPacketMsg(r *envelopMsg) {
@@ -139,9 +139,9 @@ func (c *Client) onPeerErrorMsg(r *envelopMsg) {
 	}
 
 	if errors.Cause(r.err) != io.EOF {
-		p2pLog.Info("client res error", zap.Error(r.err))
+		c.logger.Info("client res error", zap.Error(r.err))
 	} else {
-		p2pLog.Info("conn closed")
+		c.logger.Info("conn closed")
 		c.peerChan <- peerMsg{
 			err:    r.err,
 			peer:   r.Sender,

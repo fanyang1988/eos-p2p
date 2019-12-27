@@ -42,13 +42,13 @@ func (s *syncManager) init(isSyncIrr bool) {
 // OnHandshakeMsg handler func imp
 func (s *syncManager) OnHandshakeMsg(peer *Peer, msg *HandshakeMessage) {
 	if err := s.syncHandler.OnHandshakeMsg(peer, msg); err != nil {
-		p2pLog.Error("on handshake msg error", zap.Error(err))
+		s.cli.logger.Error("on handshake msg error", zap.Error(err))
 	}
 }
 
 // OnGoAwayMsg handler func imp
 func (s *syncManager) OnGoAwayMsg(peer *Peer, msg *GoAwayMessage) {
-	p2pLog.Warn("peer goaway", zap.String("reason", msg.Reason.String()))
+	s.cli.logger.Warn("peer goaway", zap.String("reason", msg.Reason.String()))
 	peer.ClosePeer()
 }
 
@@ -60,7 +60,7 @@ func (s *syncManager) OnTimeMsg(peer *Peer, msg *TimeMessage) {
 // OnNoticeMsg handler func imp
 func (s *syncManager) OnNoticeMsg(peer *Peer, msg *NoticeMessage) {
 	if err := s.syncHandler.OnNoticeMsg(peer, msg); err != nil {
-		p2pLog.Error("on notice msg error", zap.Error(err))
+		s.cli.logger.Error("on notice msg error", zap.Error(err))
 	}
 }
 
@@ -77,7 +77,7 @@ func (s *syncManager) OnSyncRequestMsg(peer *Peer, msg *SyncRequestMessage) {
 // OnSignedBlock handler func imp
 func (s *syncManager) OnSignedBlock(peer *Peer, msg *SignedBlock) {
 	if err := s.syncHandler.OnSignedBlock(peer, msg); err != nil {
-		p2pLog.Error("on block msg error", zap.Error(err))
+		s.cli.logger.Error("on block msg error", zap.Error(err))
 	}
 }
 
@@ -106,10 +106,6 @@ func (h *syncIrreversibleHandler) sendSyncRequest(peer *Peer) error {
 	delta := h.originHeadBlock - headBlockNum
 	h.requestedStartBlock = headBlockNum
 	h.requestedEndBlock = headBlockNum + uint32(math.Min(float64(delta), float64(BlockNumPerRequest)))
-
-	p2pLog.Debug("Sending sync request",
-		zap.Uint32("startBlock", h.requestedStartBlock),
-		zap.Uint32("endBlock", h.requestedEndBlock))
 
 	// send req
 	err := peer.SendSyncRequest(h.requestedStartBlock, h.requestedEndBlock+1)
@@ -150,13 +146,7 @@ func (h *syncIrreversibleHandler) OnSignedBlock(peer *Peer, msg *SignedBlock) er
 
 	if h.originHeadBlock <= blockNum {
 		// now block have got all
-
-		p2pLog.Debug("have sync all blocks needed",
-			zap.Uint32("originHead", h.originHeadBlock),
-			zap.Uint32("to", blockNum))
-
 		h.cli.syncSuccessNotice(peer)
-
 		return nil
 	}
 

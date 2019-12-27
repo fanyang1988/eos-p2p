@@ -12,7 +12,7 @@ type MsgHandler struct {
 
 // OnHandshakeMsg handler func imp
 func (m *MsgHandler) OnHandshakeMsg(peer *p2p.Peer, msg *p2p.HandshakeMessage) {
-	Logger.Info("on handshake", zap.Int16("generation", msg.Generation))
+	logger.Info("on handshake", zap.Int16("generation", msg.Generation))
 }
 
 // OnGoAwayMsg handler func imp

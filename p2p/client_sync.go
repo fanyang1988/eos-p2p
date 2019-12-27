@@ -14,7 +14,7 @@ import (
 
 // onStartSyncIrreversible start to sync all irreversible block by the peer
 func (c *Client) onStartSyncIrreversible(peer *Peer) {
-	p2pLog.Info("start sync all blocks", zap.String("addr", peer.Address))
+	c.logger.Info("start sync all blocks", zap.String("addr", peer.Address))
 	stat := c.blkStorer.State()
 	h := stat.ToHandshakeInfo()
 	peer.SendHandshake(h)
@@ -30,7 +30,7 @@ func (c *Client) startSyncIrr(peer *Peer) {
 
 // onSyncFinished (IN peerMngLoop) when sync irr success start to sync blocks and trxs( if need )
 func (c *Client) onSyncFinished(ctx context.Context, msg *peerMsg) {
-	p2pLog.Info("sync finished", zap.Uint32("current head", c.HeadBlockNum()))
+	c.logger.Info("sync finished", zap.Uint32("current head", c.HeadBlockNum()))
 
 	stat := c.blkStorer.State()
 	h := stat.ToHandshakeInfo()

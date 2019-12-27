@@ -1,11 +1,8 @@
 package p2p
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
-
-	"go.uber.org/zap"
 )
 
 // Handler interface for peer
@@ -50,28 +47,6 @@ func (f handlerFuncWithName) Handle(envelope *Envelope) {
 func (f handlerFuncWithName) Name() string {
 	return f.name
 }
-
-// LoggerHandler logs the messages back and forth.
-var LoggerHandler = NewHandlerFunc("logger", func(envelope *Envelope) {
-	data, err := json.Marshal(envelope)
-	if err != nil {
-		logErr("Marshal err", err)
-		return
-	}
-
-	p2pLog.Info("handler", zap.String("message", string(data)))
-})
-
-// StringLoggerHandler simply prints the messages as they go through the client.
-var StringLoggerHandler = NewHandlerFunc("stringLogger", func(envelope *Envelope) {
-	name, _ := envelope.Packet.Type.Name()
-	p2pLog.Info(
-		"handler Packet",
-		zap.String("name", name),
-		zap.String("sender", envelope.Sender.Address),
-		zap.Stringer("msg", envelope.Packet.P2PMessage), // this will use by String()
-	)
-})
 
 // MsgHandler handler for each msg
 type MsgHandler interface {

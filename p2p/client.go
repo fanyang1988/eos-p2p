@@ -44,6 +44,8 @@ type Client struct {
 
 	blkStorer store.BlockStorer
 
+	logger *zap.Logger
+
 	wg sync.WaitGroup
 }
 
@@ -53,6 +55,7 @@ type Options struct {
 	startBlockNum uint32
 	handlers      []Handler
 	blkStorer     store.BlockStorer
+	logger        *zap.Logger
 }
 
 // OptionFunc func for new client
@@ -83,6 +86,14 @@ func WithStorer(blk store.BlockStorer) OptionFunc {
 	}
 }
 
+// WithLogger set logger for log
+func WithLogger(l *zap.Logger) OptionFunc {
+	return func(o *Options) error {
+		o.logger = l
+		return nil
+	}
+}
+
 // NewClient create new client
 func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...OptionFunc) (*Client, error) {
 	if len(peers) == 0 {
@@ -92,6 +103,7 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 	defaultOpts := Options{
 		handlers: make([]Handler, 0, 8),
 	}
+
 	for _, o := range opts {
 		err := o(&defaultOpts)
 		if err != nil {
@@ -112,6 +124,7 @@ func NewClient(ctx context.Context, chainID string, peers []*PeerCfg, opts ...Op
 		chainID:    cID,
 		needSync:   defaultOpts.needSync,
 		blkStorer:  defaultOpts.blkStorer,
+		logger:     defaultOpts.logger,
 	}
 
 	// create sync manager
@@ -149,7 +162,7 @@ func (c *Client) closeAllPeer() {
 
 // Start start client process goroutine
 func (c *Client) Start(ctx context.Context) error {
-	p2pLog.Info("Starting client")
+	c.logger.Info("Starting client")
 
 	c.wg.Add(1)
 	go func() {
@@ -187,7 +200,7 @@ func (c *Client) HeadBlockNum() uint32 {
 func (c *Client) SetHeadBlock(blk *SignedBlock) error {
 	err := c.blkStorer.CommitBlock(blk)
 	if err != nil {
-		p2pLog.Error("set block error %s", zap.Error(err))
+		c.logger.Error("set block error %s", zap.Error(err))
 	}
 
 	return errors.Wrapf(err, "set head block")

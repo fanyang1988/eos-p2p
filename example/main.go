@@ -28,14 +28,16 @@ func waitClose() {
 	<-stopSignalChan
 }
 
+var logger *zap.Logger
+
 func main() {
 	flag.Parse()
 
+	logger = zap.NewNop()
 	if *showLog {
-		EnableLogging()
-		p2p.SetLogger(Logger)
+		logger, _ = zap.NewDevelopment()
 	}
-	defer Logger.Sync()
+	defer logger.Sync()
 
 	ctx, cf := context.WithCancel(context.Background())
 
@@ -61,25 +63,24 @@ func main() {
 		}
 	}
 
-	storer, err := store.NewBBoltStorer(Logger, *chainID, "./blocks.db", false)
+	storer, err := store.NewBBoltStorer(logger, *chainID, "./blocks.db", false)
 	if err != nil {
-		Logger.Error("new storer error", zap.Error(err))
+		logger.Error("new storer error", zap.Error(err))
 		return
 	}
 
-	//Logger.Info("P2P Client ", zap.String("peer", *peer), zap.String("chainID", *chainID))
 	client, err := p2p.NewClient(
 		ctx,
 		*chainID,
 		peersCfg,
+		p2p.WithLogger(logger),
 		p2p.WithNeedSync(1),
 		p2p.WithStorer(storer),
-		//p2p.WithHandler(p2p.StringLoggerHandler),
 		p2p.WithHandler(p2p.NewMsgHandler("tmpHandler", &MsgHandler{})),
 	)
 
 	if err != nil {
-		Logger.Error("new client error", zap.Error(err))
+		logger.Error("new client error", zap.Error(err))
 		return
 	}
 
@@ -89,5 +90,5 @@ func main() {
 
 	client.Wait()
 
-	Logger.Info("p2p node stopped")
+	logger.Info("p2p node stopped")
 }

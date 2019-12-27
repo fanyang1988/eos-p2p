@@ -32,7 +32,7 @@ func (c *Client) peerMngLoop(ctx context.Context) {
 			// if already stop loop so close directly
 			select {
 			case <-ctx.Done():
-				p2pLog.Info("close peer chan mng")
+				c.logger.Info("close peer chan mng")
 				return
 			default:
 			}
@@ -50,24 +50,24 @@ func (c *Client) peerMngLoop(ctx context.Context) {
 
 		case <-ctx.Done():
 			// no need wait all msg in chan processed
-			p2pLog.Info("close peer chan mng")
+			c.logger.Info("close peer chan mng")
 			return
 		}
 	}
 }
 
 func (c *Client) onNewPeer(ctx context.Context, msg *peerMsg) {
-	p2pLog.Info("new peer", zap.String("addr", msg.cfg.Address))
+	c.logger.Info("new peer", zap.String("addr", msg.cfg.Address))
 	_, ok := c.ps[msg.cfg.Address]
 	if ok {
-		p2pLog.Info("connect had created, no new another", zap.String("addr", msg.cfg.Address))
+		c.logger.Info("connect had created, no new another", zap.String("addr", msg.cfg.Address))
 		return
 	}
 
-	peer, err := NewPeer(msg.cfg, c.HeadBlockNum(), c.ChainID())
+	peer, err := NewPeer(msg.cfg, c, c.HeadBlockNum(), c.ChainID())
 
 	if err != nil {
-		p2pLog.Error("new peer failed", zap.String("addr", msg.peer.Address), zap.Error(err))
+		c.logger.Error("new peer failed", zap.String("addr", msg.peer.Address), zap.Error(err))
 	}
 
 	c.ps[msg.cfg.Address] = &peerStatus{
@@ -82,17 +82,17 @@ func (c *Client) onNewPeer(ctx context.Context, msg *peerMsg) {
 func (c *Client) onDelPeer(ctx context.Context, msg *peerMsg) {
 	ps, ok := c.ps[msg.cfg.Address]
 	if !ok {
-		p2pLog.Error("no status for peer found", zap.String("peer", msg.cfg.Address))
+		c.logger.Error("no status for peer found", zap.String("peer", msg.cfg.Address))
 		return // no process
 	}
 
-	p2pLog.Info("del peer", zap.String("addr", msg.cfg.Address))
+	c.logger.Info("del peer", zap.String("addr", msg.cfg.Address))
 
 	ps.status = peerStatClosed
 	ps.peer.ClosePeer()
 	ps.peer.Wait()
 
-	p2pLog.Info("peer closed", zap.String("addr", msg.cfg.Address))
+	c.logger.Info("peer closed", zap.String("addr", msg.cfg.Address))
 }
 
 func (c *Client) onErrPeer(ctx context.Context, msg *peerMsg) {
@@ -102,7 +102,7 @@ func (c *Client) onErrPeer(ctx context.Context, msg *peerMsg) {
 
 	ps, ok := c.ps[msg.peer.Address]
 	if !ok {
-		p2pLog.Error("no status for peer found", zap.String("peer", msg.peer.Address))
+		c.logger.Error("no status for peer found", zap.String("peer", msg.peer.Address))
 		return // no process
 	}
 
@@ -111,7 +111,7 @@ func (c *Client) onErrPeer(ctx context.Context, msg *peerMsg) {
 		return
 	}
 
-	p2pLog.Info("reconnect peer", zap.String("addr", msg.peer.Address))
+	c.logger.Info("reconnect peer", zap.String("addr", msg.peer.Address))
 	if err := c.StartPeer(ctx, msg.peer); err != nil {
 		time.Sleep(3 * time.Second)
 	}
@@ -120,15 +120,15 @@ func (c *Client) onErrPeer(ctx context.Context, msg *peerMsg) {
 
 // StartPeer start a peer r/w
 func (c *Client) StartPeer(ctx context.Context, p *Peer) error {
-	p2pLog.Info("Start Connect Peer", zap.String("peer", p.Address))
+	c.logger.Info("Start Connect Peer", zap.String("peer", p.Address))
 
 	ps, ok := c.ps[p.Address]
 	if !ok {
-		p2pLog.Error("no status for peer found", zap.String("peer", p.Address))
+		c.logger.Error("no status for peer found", zap.String("peer", p.Address))
 		return nil // no process
 	}
 
-	err := p.Start(ctx, c)
+	err := p.Start(ctx)
 	if err != nil {
 		c.peerChan <- peerMsg{
 			err:    errors.Wrap(err, "connect error"),

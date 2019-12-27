@@ -36,7 +36,7 @@ func (p *Peer) WriteP2PMessage(message Message) (err error) {
 
 // SendGoAway send go away message to peer
 func (p *Peer) SendGoAway(reason GoAwayReason) error {
-	p2pLog.Debug("SendGoAway", zap.String("reason", reason.String()))
+	p.cli.logger.Debug("SendGoAway", zap.String("reason", reason.String()))
 
 	return errors.WithStack(p.WriteP2PMessage(&GoAwayMessage{
 		Reason: reason,
@@ -46,7 +46,7 @@ func (p *Peer) SendGoAway(reason GoAwayReason) error {
 
 // SendSyncRequest send a sync req
 func (p *Peer) SendSyncRequest(startBlockNum uint32, endBlockNumber uint32) (err error) {
-	p2pLog.Debug("SendSyncRequest",
+	p.cli.logger.Debug("SendSyncRequest",
 		zap.String("peer", p.Address),
 		zap.Uint32("start", startBlockNum),
 		zap.Uint32("end", endBlockNumber))
@@ -61,7 +61,7 @@ func (p *Peer) SendSyncRequest(startBlockNum uint32, endBlockNumber uint32) (err
 
 // SendRequest send req msg for p2p
 func (p *Peer) SendRequest(startBlockNum uint32, endBlockNumber uint32) (err error) {
-	p2pLog.Debug("SendRequest",
+	p.cli.logger.Debug("SendRequest",
 		zap.String("peer", p.Address),
 		zap.Uint32("start", startBlockNum),
 		zap.Uint32("end", endBlockNumber))
@@ -82,7 +82,7 @@ func (p *Peer) SendRequest(startBlockNum uint32, endBlockNumber uint32) (err err
 
 // SendNotice send notice msg for p2p
 func (p *Peer) SendNotice(headBlockNum uint32, libNum uint32, mode byte) error {
-	p2pLog.Debug("Send Notice",
+	p.cli.logger.Debug("Send Notice",
 		zap.String("peer", p.Address),
 		zap.Uint32("head", headBlockNum),
 		zap.Uint32("lib", libNum),
@@ -103,7 +103,7 @@ func (p *Peer) SendNotice(headBlockNum uint32, libNum uint32, mode byte) error {
 
 // SendTime send time sync msg to peer
 func (p *Peer) SendTime(recv *TimeMessage) error {
-	p2pLog.Debug("SendTime", zap.String("peer", p.Address))
+	p.cli.logger.Debug("SendTime", zap.String("peer", p.Address))
 
 	notice := &TimeMessage{}
 
@@ -126,7 +126,7 @@ func (p *Peer) SendHandshake(info *HandshakeInfo) error {
 		return errors.Wrapf(err, "sending handshake to %s: create public key", p.Address)
 	}
 
-	p2pLog.Debug("SendHandshake", zap.String("peer", p.Address), zap.Object("info", info))
+	p.cli.logger.Debug("SendHandshake", zap.String("peer", p.Address), zap.Object("info", info))
 
 	tstamp := Tstamp{Time: info.HeadBlockTime}
 
@@ -153,7 +153,7 @@ func (p *Peer) SendHandshake(info *HandshakeInfo) error {
 		Generation:               int16(1),
 	}
 
-	p2pLog.Debug("info", zap.String("Name", handshake.String()))
+	p.cli.logger.Debug("info", zap.String("Name", handshake.String()))
 
 	err = p.WriteP2PMessage(handshake)
 	if err != nil {

@@ -46,7 +46,7 @@ func (p *Peer) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 }
 
 // NewPeer create a peer
-func NewPeer(cfg *PeerCfg, headBlockNum uint32, chainID Checksum256) (*Peer, error) {
+func NewPeer(cfg *PeerCfg, cli *Client, headBlockNum uint32, chainID Checksum256) (*Peer, error) {
 	nodeID := make([]byte, 32)
 	_, err := rand.Read(nodeID)
 	if err != nil {
@@ -67,6 +67,7 @@ func NewPeer(cfg *PeerCfg, headBlockNum uint32, chainID Checksum256) (*Peer, err
 		Name:              name,
 		connectionTimeout: 5 * time.Second,
 		wg:                &sync.WaitGroup{},
+		cli:               cli,
 	}
 
 	return res, nil
@@ -99,12 +100,10 @@ func (p *Peer) connect() error {
 }
 
 // Start connect and start read go routine
-func (p *Peer) Start(ctx context.Context, client *Client) error {
+func (p *Peer) Start(ctx context.Context) error {
 	address2log := zap.String("address", p.Address)
 
-	p.cli = client
-
-	p2pLog.Info("Dialing", address2log, zap.Duration("timeout", p.connectionTimeout))
+	p.cli.logger.Info("Dialing", address2log, zap.Duration("timeout", p.connectionTimeout))
 	err := p.connect()
 	if err != nil {
 		return err
@@ -142,7 +141,7 @@ func (p *Peer) readLoop() {
 	defer func() {
 		p.wg.Done()
 		if r := recover(); r != nil {
-			p2pLog.Error("peer readLoop panic", zap.String("addr", p.Address))
+			p.cli.logger.Error("peer readLoop panic", zap.String("addr", p.Address))
 			p.cli.packetChan <- newEnvelopMsgWithError(p, errors.Errorf("panic by %v", r))
 		}
 	}()
@@ -151,9 +150,9 @@ func (p *Peer) readLoop() {
 		packet, err := p.Read()
 
 		if err != nil {
-			//p2pLog.Warn("peer readLoop return by read error", zap.String("addr", p.Address), zap.Error(err))
+			//p.cli.logger.Warn("peer readLoop return by read error", zap.String("addr", p.Address), zap.Error(err))
 			p.cli.packetChan <- newEnvelopMsgWithError(p, errors.Wrapf(err, "read message from %s", p.Address))
-			p2pLog.Debug("peer readloop exit", zap.String("address", p.Address))
+			p.cli.logger.Debug("peer readloop exit", zap.String("address", p.Address))
 			return
 		}
 
