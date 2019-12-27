@@ -13,15 +13,18 @@ import (
 	"github.com/fanyang1988/eos-p2p/types"
 )
 
+const maxBlocksHoldInDBStat = 64
+
 // BlockDBState head state and chain state
 type BlockDBState struct {
-	ChainID                  types.Checksum256  `json:"chainID"`
-	HeadBlockNum             uint32             `json:"headNum"`
-	HeadBlockID              types.Checksum256  `json:"headID"`
-	HeadBlockTime            time.Time          `json:"headTime"`
-	LastIrreversibleBlockNum uint32             `json:"irrNum"`
-	LastIrreversibleBlockID  types.Checksum256  `json:"irrID"`
-	HeadBlock                *types.SignedBlock `json:"blk"`
+	ChainID                  types.Checksum256    `json:"chainID"`
+	HeadBlockNum             uint32               `json:"headNum"`
+	HeadBlockID              types.Checksum256    `json:"headID"`
+	HeadBlockTime            time.Time            `json:"headTime"`
+	LastIrreversibleBlockNum uint32               `json:"irrNum"`
+	LastIrreversibleBlockID  types.Checksum256    `json:"irrID"`
+	HeadBlock                *types.SignedBlock   `json:"headBlk"`
+	LastBlocks               []*types.SignedBlock `json:"blks"`
 }
 
 // ToHandshakeInfo make a handshake info for handshake message
@@ -41,6 +44,7 @@ func NewBlockDBState(chainID types.Checksum256) *BlockDBState {
 	return &BlockDBState{
 		ChainID:      chainID,
 		HeadBlockNum: 1,
+		LastBlocks:   make([]*types.SignedBlock, 0, maxBlocksHoldInDBStat+1),
 	}
 }
 
@@ -188,15 +192,27 @@ func (s *BBoltStorer) LastIrreversibleBlockID() types.Checksum256 {
 
 func (s *BBoltStorer) updateStatByBlock(blk *types.SignedBlock) error {
 	// Just set to block state
+	if s.state.HeadBlockNum >= blk.BlockNumber() {
+		return nil
+	}
+
 	s.state.HeadBlockNum = blk.BlockNumber()
 	s.state.HeadBlockID, _ = blk.BlockID()
 	s.state.HeadBlockTime = blk.Timestamp.Time
 	s.state.LastIrreversibleBlockNum = s.state.HeadBlockNum
 	s.state.LastIrreversibleBlockID = s.state.HeadBlockID
-	s.state.HeadBlock = blk
+	s.state.HeadBlock, _ = types.DeepCopyBlock(blk)
 
 	if s.state.HeadBlockNum%1000 == 0 {
 		s.logger.Info("on block head", zap.Uint32("blockNum", s.state.HeadBlockNum))
+	}
+
+	s.state.LastBlocks = append(s.state.LastBlocks, s.state.HeadBlock)
+	if len(s.state.LastBlocks) >= maxBlocksHoldInDBStat {
+		for i := 0; i < len(s.state.LastBlocks)-1; i++ {
+			s.state.LastBlocks[i] = s.state.LastBlocks[i+1]
+		}
+		s.state.LastBlocks = s.state.LastBlocks[:len(s.state.LastBlocks)-1]
 	}
 
 	return nil
@@ -239,6 +255,27 @@ func (s *BBoltStorer) CommitBlock(blk *types.SignedBlock) error {
 	}
 
 	return nil
+}
+
+// GetBlockByNum get block by num, if not store all blocks, try to find in state cache
+func (s *BBoltStorer) GetBlockByNum(blockNum uint32) (*types.SignedBlock, bool) {
+	// TODO: find in blocks
+	if !s.isStoreAllBlocks {
+		if len(s.state.LastBlocks) == 0 {
+			return nil, false
+		}
+
+		baseNum := s.state.LastBlocks[0].BlockNumber()
+
+		if blockNum < baseNum ||
+			blockNum > s.state.LastBlocks[len(s.state.LastBlocks)-1].BlockNumber() {
+			return nil, false
+		}
+
+		return s.state.LastBlocks[blockNum-baseNum], true
+	}
+
+	return nil, false
 }
 
 // CommitTrx commit trx
