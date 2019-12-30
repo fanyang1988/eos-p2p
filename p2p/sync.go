@@ -177,6 +177,11 @@ func (h *syncNoIrrHandler) OnHandshakeMsg(peer *Peer, msg *HandshakeMessage) err
 // OnNoticeMsg
 func (h *syncNoIrrHandler) OnNoticeMsg(peer *Peer, msg *NoticeMessage) error {
 	// TODO: can sync to other
+
+	h.cli.logger.Info("handle notice", zap.String("peer", peer.Address),
+		zap.String("known_trx", msg.KnownTrx.String()),
+		zap.String("known_blocks", msg.KnownBlocks.String()))
+
 	return nil
 }
 

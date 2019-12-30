@@ -16,6 +16,9 @@ import (
 func (c *Client) onStartSyncIrreversible(peer *Peer) {
 	c.logger.Info("start sync all blocks", zap.String("addr", peer.Address))
 	stat := c.blkStorer.State()
+
+	c.logger.Info("curr stat", zap.Uint32("headNum", stat.HeadBlockNum))
+
 	h := stat.ToHandshakeInfo()
 	peer.SendHandshake(h)
 }
