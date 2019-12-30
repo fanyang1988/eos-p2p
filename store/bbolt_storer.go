@@ -21,22 +21,34 @@ type BlockDBState struct {
 	HeadBlockNum             uint32               `json:"headNum"`
 	HeadBlockID              types.Checksum256    `json:"headID"`
 	HeadBlockTime            time.Time            `json:"headTime"`
-	LastIrreversibleBlockNum uint32               `json:"irrNum"`
-	LastIrreversibleBlockID  types.Checksum256    `json:"irrID"`
 	HeadBlock                *types.SignedBlock   `json:"headBlk"`
 	LastBlocks               []*types.SignedBlock `json:"blks"`
 }
 
 // ToHandshakeInfo make a handshake info for handshake message
 func (b *BlockDBState) ToHandshakeInfo() *types.HandshakeInfo {
-	return &types.HandshakeInfo{
-		ChainID:                  b.ChainID,
-		HeadBlockNum:             b.HeadBlockNum,
-		HeadBlockID:              b.HeadBlockID,
-		HeadBlockTime:            b.HeadBlockTime,
-		LastIrreversibleBlockNum: b.LastIrreversibleBlockNum,
-		LastIrreversibleBlockID:  b.LastIrreversibleBlockID,
+	// TODO: a very simple irr
+	irrNum := b.HeadBlockNum - 9
+	if irrNum < 1 {
+		irrNum = 1
 	}
+
+	head := b.HeadBlock
+	irr, ok := b.getBlockByNum(irrNum)
+	res := &types.HandshakeInfo{
+		ChainID:                  b.ChainID,
+	}
+
+	res.HeadBlockNum = head.BlockNumber()
+	res.HeadBlockID, _ = head.BlockID()
+	res.HeadBlockTime = head.Timestamp.Time
+
+	if ok {
+		res.LastIrreversibleBlockNum = irr.BlockNumber()
+		res.LastIrreversibleBlockID, _ = irr.BlockID()
+	}
+
+	return res
 }
 
 // NewBlockDBState new stat
@@ -56,6 +68,22 @@ func (b *BlockDBState) Bytes() ([]byte, error) {
 // FromBytes from Bytes
 func (b *BlockDBState) FromBytes(data []byte) error {
 	return json.Unmarshal(data, b)
+}
+
+// getBlockByNum get block by num, if not store all blocks, try to find in state cache
+func (b *BlockDBState) getBlockByNum(blockNum uint32) (*types.SignedBlock, bool) {
+	if len(b.LastBlocks) == 0 {
+		return nil, false
+	}
+
+	baseNum := b.LastBlocks[0].BlockNumber()
+
+	if blockNum < baseNum ||
+		blockNum > b.LastBlocks[len(b.LastBlocks)-1].BlockNumber() {
+		return nil, false
+	}
+
+	return b.LastBlocks[blockNum-baseNum], true
 }
 
 // BBoltStorer a very simple storer imp for test imp by storer
@@ -176,31 +204,17 @@ func (s *BBoltStorer) HeadBlockID() types.Checksum256 {
 	return s.state.HeadBlockID
 }
 
-// LastIrreversibleBlockNum get LastIrreversibleBlockNum
-func (s *BBoltStorer) LastIrreversibleBlockNum() uint32 {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.state.LastIrreversibleBlockNum
-}
-
-// LastIrreversibleBlockID get LastIrreversibleBlockID
-func (s *BBoltStorer) LastIrreversibleBlockID() types.Checksum256 {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.state.LastIrreversibleBlockID
-}
-
 func (s *BBoltStorer) updateStatByBlock(blk *types.SignedBlock) error {
 	// Just set to block state
 	if s.state.HeadBlockNum >= blk.BlockNumber() {
 		return nil
 	}
 
+	s.logger.Info("up block", zap.Uint32("blockNum", blk.BlockNumber()))
+
 	s.state.HeadBlockNum = blk.BlockNumber()
 	s.state.HeadBlockID, _ = blk.BlockID()
 	s.state.HeadBlockTime = blk.Timestamp.Time
-	s.state.LastIrreversibleBlockNum = s.state.HeadBlockNum
-	s.state.LastIrreversibleBlockID = s.state.HeadBlockID
 	s.state.HeadBlock, _ = types.DeepCopyBlock(blk)
 
 	if s.state.HeadBlockNum%1000 == 0 {
@@ -261,18 +275,7 @@ func (s *BBoltStorer) CommitBlock(blk *types.SignedBlock) error {
 func (s *BBoltStorer) GetBlockByNum(blockNum uint32) (*types.SignedBlock, bool) {
 	// TODO: find in blocks
 	if !s.isStoreAllBlocks {
-		if len(s.state.LastBlocks) == 0 {
-			return nil, false
-		}
-
-		baseNum := s.state.LastBlocks[0].BlockNumber()
-
-		if blockNum < baseNum ||
-			blockNum > s.state.LastBlocks[len(s.state.LastBlocks)-1].BlockNumber() {
-			return nil, false
-		}
-
-		return s.state.LastBlocks[blockNum-baseNum], true
+		return s.state.getBlockByNum(blockNum)
 	}
 
 	return nil, false

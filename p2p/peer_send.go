@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"bytes"
-	"runtime"
 	"time"
 
 	"github.com/pkg/errors"
@@ -101,6 +100,28 @@ func (p *Peer) SendNotice(headBlockNum uint32, libNum uint32, mode byte) error {
 	return errors.WithStack(p.WriteP2PMessage(notice))
 }
 
+// SendNoticeHeadCatchup send notice msg for p2p
+func (p *Peer) SendNoticeHeadCatchup(msg *NoticeMessage) error {
+	p.cli.logger.Debug("SendNoticeHeadCatchup",
+		zap.String("peer", p.Address),
+		zap.String("trx", msg.KnownTrx.String()),
+		zap.String("blk", msg.KnownBlocks.String()))
+
+	notice := &NoticeMessage{
+		KnownTrx: OrderedBlockIDs{
+			Mode:    [4]byte{0, 0, 0, 0},
+			Pending: msg.KnownTrx.Pending,
+			IDs:     msg.KnownTrx.IDs,
+		},
+		KnownBlocks: OrderedBlockIDs{
+			Mode:    [4]byte{1, 0, 0, 0},
+			Pending: msg.KnownBlocks.Pending,
+			IDs:     msg.KnownBlocks.IDs,
+		},
+	}
+	return errors.WithStack(p.WriteP2PMessage(notice))
+}
+
 // SendTime send time sync msg to peer
 func (p *Peer) SendTime(recv *TimeMessage) error {
 	p.cli.logger.Debug("SendTime", zap.String("peer", p.Address))
@@ -121,6 +142,7 @@ func (p *Peer) SendTime(recv *TimeMessage) error {
 // SendHandshake send handshake msg to peer
 func (p *Peer) SendHandshake(info *HandshakeInfo) error {
 
+	// TODO: support peer key
 	publicKey, err := types.NewPublicKey("EOS1111111111111111111111111111111114T1Anm")
 	if err != nil {
 		return errors.Wrapf(err, "sending handshake to %s: create public key", p.Address)
@@ -135,6 +157,8 @@ func (p *Peer) SendHandshake(info *HandshakeInfo) error {
 		Content: make([]byte, 65, 65),
 	}
 
+	p.sendHandshakeCount++
+
 	handshake := &HandshakeMessage{
 		NetworkVersion:           1206,
 		ChainID:                  info.ChainID,
@@ -148,9 +172,9 @@ func (p *Peer) SendHandshake(info *HandshakeInfo) error {
 		LastIrreversibleBlockID:  info.LastIrreversibleBlockID,
 		HeadNum:                  info.HeadBlockNum,
 		HeadID:                   info.HeadBlockID,
-		OS:                       runtime.GOOS,
+		OS:                       "osx", //runtime.GOOS,
 		Agent:                    p.agent,
-		Generation:               int16(1),
+		Generation:               p.sendHandshakeCount,
 	}
 
 	p.cli.logger.Debug("info", zap.String("Name", handshake.String()))

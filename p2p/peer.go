@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -29,6 +30,10 @@ type Peer struct {
 	connectionTimeout time.Duration
 	cli               *Client
 	wg                *sync.WaitGroup
+
+	lastHandshakeSend  *types.HandshakeMessage
+	lastHandshakeRecv  *types.HandshakeMessage
+	sendHandshakeCount int16
 }
 
 // PeerCfg config for peer
@@ -156,6 +161,49 @@ func (p *Peer) readLoop() {
 			return
 		}
 
+		if err := p.onMsg(packet); err != nil {
+			p.cli.packetChan <- newEnvelopMsgWithError(p, errors.Wrapf(err, "peer process message from %s", p.Address))
+			p.cli.logger.Debug("peer readloop exit", zap.String("address", p.Address))
+			return
+		}
 		p.cli.packetChan <- newEnvelopMsg(p, packet)
+	}
+}
+
+func (p *Peer) onMsg(msg *types.Packet) error {
+	switch msg.P2PMessage.(type) {
+	case *HandshakeMessage:
+		handshakeMessage, ok := msg.P2PMessage.(*HandshakeMessage)
+		if ok && handshakeMessage != nil {
+			p.onHandshakeMsg(handshakeMessage)
+		}
+	case *NoticeMessage:
+		noticeMsg, ok := msg.P2PMessage.(*NoticeMessage)
+		if ok && noticeMsg != nil {
+			p.onNoticeMsg(noticeMsg)
+		}
+	case *GoAwayMessage:
+		goAwayMsg, ok := msg.P2PMessage.(*GoAwayMessage)
+		if ok && goAwayMsg != nil {
+			p.onGoAwayMsg(goAwayMsg)
+		}
+	}
+	return nil
+}
+
+func (p *Peer) onHandshakeMsg(msg *HandshakeMessage) {
+	p.lastHandshakeRecv = msg
+}
+
+func (p *Peer) onGoAwayMsg(msg *GoAwayMessage) {
+	// TODO: exit in peer
+}
+
+func (p *Peer) onNoticeMsg(msg *NoticeMessage) {
+	// TODO: fix notice msg mode type
+	switch binary.LittleEndian.Uint32(msg.KnownTrx.Mode[:]) {
+	case 1:
+		p.cli.logger.Debug("recv trx catch_up notice")
+	default:
 	}
 }

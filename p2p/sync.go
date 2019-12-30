@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"encoding/binary"
 	"math"
 
 	"github.com/pkg/errors"
@@ -28,7 +29,8 @@ type syncHandlerInterface interface {
 func (s *syncManager) init(isSyncIrr bool) {
 	if isSyncIrr {
 		s.syncHandler = &syncIrreversibleHandler{
-			cli: s.cli,
+			cli:      s.cli,
+			isInSync: true,
 		}
 	} else {
 		s.syncHandler = &syncNoIrrHandler{
@@ -92,6 +94,7 @@ type syncIrreversibleHandler struct {
 	requestedEndBlock   uint32
 	originHeadBlock     uint32
 	cli                 *Client
+	isInSync            bool
 }
 
 // No need imp
@@ -108,7 +111,7 @@ func (h *syncIrreversibleHandler) sendSyncRequest(peer *Peer) error {
 	h.requestedEndBlock = headBlockNum + uint32(math.Min(float64(delta), float64(BlockNumPerRequest)))
 
 	// send req
-	err := peer.SendSyncRequest(h.requestedStartBlock, h.requestedEndBlock+1)
+	err := peer.SendSyncRequest(h.requestedStartBlock, h.requestedEndBlock)
 	if err != nil {
 		return errors.Wrapf(err, "send sync request to %s", peer.Address)
 	}
@@ -125,11 +128,28 @@ func (h *syncIrreversibleHandler) OnHandshakeMsg(peer *Peer, msg *HandshakeMessa
 
 // OnNoticeMsg
 func (h *syncIrreversibleHandler) OnNoticeMsg(peer *Peer, msg *NoticeMessage) error {
+	h.cli.logger.Info("handle notice", zap.String("peer", peer.Address),
+		zap.String("known_trx", msg.KnownTrx.String()),
+		zap.String("known_blocks", msg.KnownBlocks.String()))
+
 	pendingNum := msg.KnownBlocks.Pending
 	if pendingNum > 0 {
 		h.originHeadBlock = pendingNum
 		return h.sendSyncRequest(peer)
 	}
+
+	switch binary.LittleEndian.Uint32(msg.KnownTrx.Mode[:]) {
+	case 1:
+		if h.isInSync {
+			h.isInSync = false
+			h.cli.logger.Debug("recv trx catch_up notice")
+			peer.SendNoticeHeadCatchup(msg)
+			stat := h.cli.blkStorer.State()
+			return peer.SendHandshake(stat.ToHandshakeInfo())
+		}
+	default:
+	}
+
 	return nil
 }
 
@@ -166,12 +186,10 @@ func (h *syncNoIrrHandler) OnSyncRequestMsg(peer *Peer, msg *SyncRequestMessage)
 
 // OnHandshakeMsg
 func (h *syncNoIrrHandler) OnHandshakeMsg(peer *Peer, msg *HandshakeMessage) error {
-	msg.NodeID = peer.NodeID
-	msg.P2PAddress = peer.Name
+	stat := h.cli.blkStorer.State()
+	hsInfo := stat.ToHandshakeInfo()
 
-	// TODO: use status from forkDB
-
-	return peer.WriteP2PMessage(msg)
+	return peer.SendHandshake(hsInfo)
 }
 
 // OnNoticeMsg

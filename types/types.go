@@ -1,13 +1,12 @@
 package types
 
 import (
-	"bytes"
 	"fmt"
+	"github.com/pkg/errors"
 	"time"
 
 	eos "github.com/eosforce/goeosforce"
 	"github.com/eosforce/goeosforce/ecc"
-	"github.com/pkg/errors"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -106,23 +105,111 @@ func (h HandshakeInfo) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
+// NewEmptyBlock create an empty block can be unmarshal data
+func NewEmptyBlock() *SignedBlock {
+	return &SignedBlock{
+		SignedBlockHeader: eos.SignedBlockHeader{
+			BlockHeader: eos.BlockHeader{
+				NewProducers: &eos.OptionalProducerSchedule{
+					ProducerSchedule: eos.ProducerSchedule{
+						Producers: make([]eos.ProducerKey, 0, 23),
+					},
+				},
+				HeaderExtensions: make([]*eos.Extension, 0, 4),
+			},
+		},
+		Transactions:    make([]eos.TransactionReceipt, 0, 256),
+		BlockExtensions: make([]*eos.Extension, 0, 4),
+	}
+}
+
+func CopyChecksum256(c Checksum256) Checksum256 {
+	b := make([]byte, 0, len(c))
+	b = append(b, c...)
+	return Checksum256(b)
+}
+
+func CopyBytes(c []byte) []byte {
+	res := make([]byte, 0, len(c))
+	res = append(res, c...)
+	return res
+}
+
+func CopySignature(c ecc.Signature) ecc.Signature {
+	res, err := ecc.NewSignature(c.String())
+	if err != nil {
+		panic(errors.Wrapf(err, "copy signature"))
+	}
+	return res
+}
+
+func CopyExt(c *eos.Extension) *eos.Extension {
+	return &eos.Extension{
+		Type: c.Type,
+		Data: CopyBytes(c.Data),
+	}
+}
+
 // DeepCopyBlock a deep copy for a block
 func DeepCopyBlock(b *SignedBlock) (*SignedBlock, error) {
-	res := &SignedBlock{}
-
-	buffer := bytes.NewBuffer(make([]byte, 0, 128*1024))
-	encoder := eos.NewEncoder(buffer)
-
-	err := encoder.Encode(b)
-	if err != nil {
-		return nil, errors.Wrapf(err, "deep copy encode")
+	res := &SignedBlock{
+		SignedBlockHeader: eos.SignedBlockHeader{
+			BlockHeader: eos.BlockHeader{
+				Timestamp:        b.Timestamp,
+				Producer:         b.Producer,
+				Confirmed:        b.Confirmed,
+				Previous:         CopyChecksum256(b.Previous),
+				TransactionMRoot: CopyChecksum256(b.TransactionMRoot),
+				ActionMRoot:      CopyChecksum256(b.ActionMRoot),
+				ScheduleVersion:  b.ScheduleVersion,
+				HeaderExtensions: make([]*eos.Extension, 0, len(b.HeaderExtensions)),
+			},
+			ProducerSignature: CopySignature(b.ProducerSignature),
+		},
+		Transactions:    make([]eos.TransactionReceipt, 0, len(b.Transactions)),
+		BlockExtensions: make([]*eos.Extension, 0, len(b.BlockExtensions)),
 	}
 
-	decoder := eos.NewDecoder(buffer.Bytes())
-	err = decoder.Decode(res)
+	if b.NewProducers != nil {
+		res.NewProducers = &eos.OptionalProducerSchedule{
+			ProducerSchedule: eos.ProducerSchedule{
+				Version:   b.NewProducers.Version,
+				Producers: make([]eos.ProducerKey, 0, len(b.NewProducers.Producers)),
+			},
+		}
+		for _, prod := range b.NewProducers.Producers {
+			res.NewProducers.Producers = append(res.NewProducers.Producers, eos.ProducerKey{
+				AccountName:     prod.AccountName,
+				BlockSigningKey: prod.BlockSigningKey,
+			})
+		}
+	}
 
-	if err != nil {
-		return nil, errors.Wrapf(err, "deep copy decoder")
+	for _, ext := range b.HeaderExtensions {
+		res.HeaderExtensions = append(res.HeaderExtensions, CopyExt(ext))
+	}
+
+	for _, ext := range b.BlockExtensions {
+		res.BlockExtensions = append(res.BlockExtensions, CopyExt(ext))
+	}
+
+	for _, trx := range b.Transactions {
+		trxCopy := eos.TransactionReceipt{
+			TransactionReceiptHeader: trx.TransactionReceiptHeader,
+			Transaction: eos.TransactionWithID{
+				ID: CopyChecksum256(trx.Transaction.ID),
+				Packed: &eos.PackedTransaction{
+					Signatures:            make([]ecc.Signature, 0, len(trx.Transaction.Packed.Signatures)),
+					Compression:           trx.Transaction.Packed.Compression,
+					PackedContextFreeData: CopyBytes(trx.Transaction.Packed.PackedContextFreeData),
+					PackedTransaction:     CopyBytes(trx.Transaction.Packed.PackedTransaction),
+				},
+			},
+		}
+		for _, s := range trx.Transaction.Packed.Signatures {
+			trxCopy.Transaction.Packed.Signatures = append(trxCopy.Transaction.Packed.Signatures, CopySignature(s))
+		}
+		res.Transactions = append(res.Transactions, trxCopy)
 	}
 
 	return res, nil
