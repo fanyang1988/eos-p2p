@@ -79,6 +79,9 @@ type Signature = ecc.Signature
 // PublicKey ecc types
 type PublicKey = ecc.PublicKey
 
+// BlockTimestamp block time
+type BlockTimestamp = eos.BlockTimestamp
+
 // HandshakeInfo handshake state for peer
 type HandshakeInfo struct {
 	ChainID                  Checksum256

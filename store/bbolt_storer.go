@@ -17,12 +17,12 @@ const maxBlocksHoldInDBStat = 64
 
 // BlockDBState head state and chain state
 type BlockDBState struct {
-	ChainID                  types.Checksum256    `json:"chainID"`
-	HeadBlockNum             uint32               `json:"headNum"`
-	HeadBlockID              types.Checksum256    `json:"headID"`
-	HeadBlockTime            time.Time            `json:"headTime"`
-	HeadBlock                *types.SignedBlock   `json:"headBlk"`
-	LastBlocks               []*types.SignedBlock `json:"blks"`
+	ChainID       types.Checksum256    `json:"chainID"`
+	HeadBlockNum  uint32               `json:"headNum"`
+	HeadBlockID   types.Checksum256    `json:"headID"`
+	HeadBlockTime time.Time            `json:"headTime"`
+	HeadBlock     *types.SignedBlock   `json:"headBlk"`
+	LastBlocks    []*types.SignedBlock `json:"blks"`
 }
 
 // ToHandshakeInfo make a handshake info for handshake message
@@ -33,16 +33,19 @@ func (b *BlockDBState) ToHandshakeInfo() *types.HandshakeInfo {
 		irrNum = 1
 	}
 
-	head := b.HeadBlock
-	irr, ok := b.getBlockByNum(irrNum)
 	res := &types.HandshakeInfo{
-		ChainID:                  b.ChainID,
+		ChainID:      b.ChainID,
+		HeadBlockNum: 1,
 	}
 
-	res.HeadBlockNum = head.BlockNumber()
-	res.HeadBlockID, _ = head.BlockID()
-	res.HeadBlockTime = head.Timestamp.Time
+	head := b.HeadBlock
+	if head != nil {
+		res.HeadBlockNum = head.BlockNumber()
+		res.HeadBlockID, _ = head.BlockID()
+		res.HeadBlockTime = head.Timestamp.Time
+	}
 
+	irr, ok := b.getBlockByNum(irrNum)
 	if ok {
 		res.LastIrreversibleBlockNum = irr.BlockNumber()
 		res.LastIrreversibleBlockID, _ = irr.BlockID()
