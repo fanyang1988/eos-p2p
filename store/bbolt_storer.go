@@ -61,7 +61,7 @@ func (s *BBoltStorer) initState(chainID types.Checksum256) error {
 
 		stateBytes := stateBucket.Get([]byte("stat"))
 
-		s.logger.Debug("headstate", zap.String("stat", string(stateBytes)))
+		//s.logger.Debug("headstate", zap.String("stat", string(stateBytes)))
 
 		if len(stateBytes) == 0 {
 			s.logger.Debug("init head state")

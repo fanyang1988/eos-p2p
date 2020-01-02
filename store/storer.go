@@ -6,9 +6,7 @@ import "github.com/fanyang1988/eos-p2p/types"
 type BlockStorer interface {
 	ChainID() types.Checksum256
 	HeadBlockNum() uint32
-	HeadBlockID() types.Checksum256
 	CommitBlock(blk *types.SignedBlock) error
-	CommitTrx(trx *types.PackedTransactionMessage) error
 	State() BlockDBState
 	GetBlockByNum(blockNum uint32) (*types.SignedBlock, bool)
 	Flush() error
