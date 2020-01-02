@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/pkg/errors"
@@ -111,6 +112,9 @@ func (h HandshakeInfo) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 
 // NewEmptyBlock create an empty block can be unmarshal data
 func NewEmptyBlock() *SignedBlock {
+	// just a value
+	sign, _ := ecc.NewSignature("SIG_K1_K1eEGkH78D3GzkGnoFdJ4mQ12ihxryfRErHzvBcfzy8kiSWepjB4tPwivavJoZeX47gKfGDYsk6LtyCrth3cbQF4Az8aN8")
+
 	return &SignedBlock{
 		SignedBlockHeader: eos.SignedBlockHeader{
 			BlockHeader: eos.BlockHeader{
@@ -121,6 +125,7 @@ func NewEmptyBlock() *SignedBlock {
 				},
 				HeaderExtensions: make([]*eos.Extension, 0, 4),
 			},
+			ProducerSignature: sign,
 		},
 		Transactions:    make([]eos.TransactionReceipt, 0, 256),
 		BlockExtensions: make([]*eos.Extension, 0, 4),
@@ -222,3 +227,17 @@ func DeepCopyBlock(b *SignedBlock) (*SignedBlock, error) {
 type AccountName = eos.AccountName
 type ActionName = eos.ActionName
 type Name = eos.Name
+
+type Encoder = eos.Encoder
+
+// NewEncoder is a rename to eos NewEncoder
+func NewEncoder(w io.Writer) *Encoder {
+	return eos.NewEncoder(w)
+}
+
+type Decoder = eos.Decoder
+
+// NewDecoder is a rename to eos NewDecoder
+func NewDecoder(data []byte) *Decoder {
+	return eos.NewDecoder(data)
+}

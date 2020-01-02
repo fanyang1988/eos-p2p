@@ -1,7 +1,7 @@
 package store
 
 import (
-	"encoding/json"
+	"bytes"
 	"time"
 
 	"github.com/fanyang1988/eos-p2p/types"
@@ -33,7 +33,7 @@ func (b *BlockDBState) ToHandshakeInfo() *types.HandshakeInfo {
 	}
 
 	head := b.HeadBlock
-	if head != nil {
+	if head != nil && len(head.Previous) > 0 {
 		res.HeadBlockNum = head.BlockNumber()
 		res.HeadBlockID, _ = head.BlockID()
 		res.HeadBlockTime = head.Timestamp.Time
@@ -53,18 +53,28 @@ func NewBlockDBState(chainID types.Checksum256) *BlockDBState {
 	return &BlockDBState{
 		ChainID:      chainID,
 		HeadBlockNum: 1,
+		HeadBlock:    types.NewEmptyBlock(),
 		LastBlocks:   make([]*types.SignedBlock, 0, maxBlocksHoldInDBStat+1),
 	}
 }
 
 // Bytes to bytes to store
 func (b *BlockDBState) Bytes() ([]byte, error) {
-	return json.Marshal(*b)
+	var buffer bytes.Buffer
+	encoder := types.NewEncoder(&buffer)
+
+	if err := encoder.Encode(b); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }
 
 // FromBytes from Bytes
 func (b *BlockDBState) FromBytes(data []byte) error {
-	return json.Unmarshal(data, b)
+	decoder := types.NewDecoder(data)
+	decoder.DecodeActions(false)
+	return decoder.Decode(b)
 }
 
 // getBlockByNum get block by num, if not store all blocks, try to find in state cache

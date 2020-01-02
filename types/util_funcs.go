@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"io"
@@ -86,6 +87,18 @@ func readPacket(r io.Reader, conn net.Conn) (*Packet, error) {
 	}
 	packet.Raw = data
 	return packet, nil
+}
+
+// EncodeToEOS encode as the eos binary format
+func EncodeToEOS(obj interface{}) ([]byte, error) {
+	var buffer bytes.Buffer
+	encoder := eos.NewEncoder(&buffer)
+
+	if err := encoder.Encode(obj); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }
 
 // IsChecksumEq is two Checksum256 is same
