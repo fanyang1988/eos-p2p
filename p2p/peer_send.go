@@ -45,10 +45,10 @@ func (p *Peer) SendGoAway(reason GoAwayReason) error {
 
 // SendSyncRequest send a sync req
 func (p *Peer) SendSyncRequest(startBlockNum uint32, endBlockNumber uint32) (err error) {
-	p.cli.logger.Debug("SendSyncRequest",
-		zap.String("peer", p.Address),
-		zap.Uint32("start", startBlockNum),
-		zap.Uint32("end", endBlockNumber))
+	//p.cli.logger.Debug("SendSyncRequest",
+	//	zap.String("peer", p.Address),
+	//	zap.Uint32("start", startBlockNum),
+	//	zap.Uint32("end", endBlockNumber))
 
 	syncRequest := &SyncRequestMessage{
 		StartBlock: startBlockNum,

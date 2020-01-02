@@ -36,6 +36,7 @@ func main() {
 	logger = zap.NewNop()
 	if *showLog {
 		logger, _ = zap.NewDevelopment()
+		//types.EnableDetailLogs()
 	}
 	defer logger.Sync()
 
@@ -89,6 +90,11 @@ func main() {
 	cf()
 
 	client.Wait()
+
+	logger.Info("wait storer stop")
+
+	storer.Close()
+	storer.Wait()
 
 	logger.Info("p2p node stopped")
 }
