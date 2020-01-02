@@ -9,6 +9,8 @@ github.com/eosforce/goeosforce v0.1.1-0.20191227085715-a597b3ad5d64 h1:L0NIchM7U
 github.com/eosforce/goeosforce v0.1.1-0.20191227085715-a597b3ad5d64/go.mod h1:uWBEQdXaQ+NFKWq4pdwvUfCWuszfHdYHQmFNtz0ExIU=
 github.com/eosforce/goeosforce v0.1.1-0.20191231063007-ab74cea74467 h1:p8EPksowCZ1/3k3WtqZgm/VkOoIDPSX+Ppk1QKvKH+E=
 github.com/eosforce/goeosforce v0.1.1-0.20191231063007-ab74cea74467/go.mod h1:uWBEQdXaQ+NFKWq4pdwvUfCWuszfHdYHQmFNtz0ExIU=
+github.com/eosforce/goeosforce v0.1.1-0.20191231085450-a9163f430856 h1:BGybFALwtABv2/KVtjuSgJ3NVmAbN3MiJjx8ZawwIYA=
+github.com/eosforce/goeosforce v0.1.1-0.20191231085450-a9163f430856/go.mod h1:uWBEQdXaQ+NFKWq4pdwvUfCWuszfHdYHQmFNtz0ExIU=
 github.com/fanyang1988/eos-go v0.8.13 h1:EyNydTDGNdWQORoZ4y2mFuu717Bx1mFV4DLtKdbXm6U=
 github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
 github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=

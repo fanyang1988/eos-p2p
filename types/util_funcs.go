@@ -11,6 +11,26 @@ import (
 	"github.com/pkg/errors"
 )
 
+// NewChecksum256 new checksum256 from string
+func NewChecksum256(hexStr string) (Checksum256, error) {
+	res, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return Checksum256([]byte{}), err
+	}
+
+	return Checksum256(res), nil
+}
+
+// MustNewChecksum256 new checksum256 from string, if err panic
+func MustNewChecksum256(hexStr string) Checksum256 {
+	res, err := hex.DecodeString(hexStr)
+	if err != nil {
+		panic(errors.Wrapf(err, "decode str %s", hexStr))
+	}
+
+	return Checksum256(res)
+}
+
 // NewPublicKey create public key
 func NewPublicKey(pubKey string) (out PublicKey, err error) {
 	return ecc.NewPublicKey(pubKey)
@@ -84,7 +104,7 @@ func IsChecksumEq(l Checksum256, r Checksum256) bool {
 }
 
 // EnableDetailLogs enable logs for chain package
-func EnableDetailLogs(){
+func EnableDetailLogs() {
 	eos.EnableEncoderLogging()
 	eos.EnableDecoderLogging()
 	eos.EnableABIEncoderLogging()

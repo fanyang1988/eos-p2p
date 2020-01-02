@@ -2,8 +2,9 @@ package types
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"time"
+
+	"github.com/pkg/errors"
 
 	eos "github.com/eosforce/goeosforce"
 	"github.com/eosforce/goeosforce/ecc"
@@ -158,7 +159,7 @@ func DeepCopyBlock(b *SignedBlock) (*SignedBlock, error) {
 	res := &SignedBlock{
 		SignedBlockHeader: eos.SignedBlockHeader{
 			BlockHeader: eos.BlockHeader{
-				Timestamp:        b.Timestamp,
+				Timestamp:        BlockTimestamp{Time: b.Timestamp.UTC()},
 				Producer:         b.Producer,
 				Confirmed:        b.Confirmed,
 				Previous:         CopyChecksum256(b.Previous),
@@ -217,3 +218,7 @@ func DeepCopyBlock(b *SignedBlock) (*SignedBlock, error) {
 
 	return res, nil
 }
+
+type AccountName = eos.AccountName
+type ActionName = eos.ActionName
+type Name = eos.Name
