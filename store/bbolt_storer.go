@@ -136,7 +136,7 @@ func (s *BBoltStorer) updateStatByBlock(blk *types.SignedBlock) error {
 		return nil
 	}
 
-	s.logger.Info("up block", zap.Uint32("blockNum", blk.BlockNumber()))
+	// s.logger.Info("up block", zap.Uint32("blockNum", blk.BlockNumber()))
 
 	s.state.HeadBlockNum = blk.BlockNumber()
 	s.state.HeadBlockID, _ = blk.BlockID()

@@ -182,8 +182,6 @@ func (c *Client) Start(ctx context.Context) error {
 // Wait wait client closed
 func (c *Client) Wait() {
 	c.wg.Wait()
-	c.blkStorer.Close()
-	c.blkStorer.Wait()
 }
 
 // ChainID get chainID from the net client to connect
