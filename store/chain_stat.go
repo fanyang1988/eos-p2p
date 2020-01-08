@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"time"
 
-	"github.com/fanyang1988/eos-p2p/types"
+	"github.com/eosforce/eos-p2p/types"
 )
 
 const maxBlocksHoldInDBStat = 64

@@ -1,6 +1,6 @@
 package store
 
-import "github.com/fanyang1988/eos-p2p/types"
+import "github.com/eosforce/eos-p2p/types"
 
 // BlockStorer interface for storer to db
 type BlockStorer interface {

@@ -3,8 +3,8 @@ package types
 import (
 	"time"
 
-	eos "github.com/eosforce/goeosforce"
-	"github.com/eosforce/goeosforce/ecc"
+	eos "github.com/eoscanada/eos-go"
+	"github.com/eoscanada/eos-go/ecc"
 )
 
 func newBlockForTest(num uint32) *SignedBlock {

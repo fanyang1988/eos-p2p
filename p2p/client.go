@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/fanyang1988/eos-p2p/store"
+	"github.com/eosforce/eos-p2p/store"
 )
 
 type peerStatusTyp uint8

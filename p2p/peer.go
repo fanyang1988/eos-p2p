@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/fanyang1988/eos-p2p/types"
+	"github.com/eosforce/eos-p2p/types"
 )
 
 // Peer a p2p peer to other

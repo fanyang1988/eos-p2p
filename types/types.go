@@ -6,9 +6,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
-	eos "github.com/eosforce/goeosforce"
-	"github.com/eosforce/goeosforce/ecc"
+	eos "github.com/eoscanada/eos-go"
+	"github.com/eoscanada/eos-go/ecc"
 	"go.uber.org/zap/zapcore"
 )
 

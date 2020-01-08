@@ -2,8 +2,7 @@ package main
 
 import (
 	"go.uber.org/zap"
-
-	"github.com/fanyang1988/eos-p2p/p2p"
+	"github.com/eosforce/eos-p2p/p2p"
 )
 
 // MsgHandler p2p.MsgHandler imp

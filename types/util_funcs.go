@@ -7,8 +7,8 @@ import (
 	"io"
 	"net"
 
-	eos "github.com/eosforce/goeosforce"
-	"github.com/eosforce/goeosforce/ecc"
+	eos "github.com/eoscanada/eos-go"
+	"github.com/eoscanada/eos-go/ecc"
 	"github.com/pkg/errors"
 )
 

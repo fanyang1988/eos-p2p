@@ -1,7 +1,7 @@
 package p2p
 
 import (
-	"github.com/fanyang1988/eos-p2p/types"
+	"github.com/eosforce/eos-p2p/types"
 )
 
 // Message msg
