@@ -61,7 +61,6 @@ const (
 	goAwayAuthentication = types.GoAwayAuthentication
 	goAwayFatalOther     = types.GoAwayFatalOther
 	goAwayBenignOther    = types.GoAwayBenignOther
-	goAwayCrazy          = types.GoAwayCrazy
 )
 
 // CurveK1 ecc types

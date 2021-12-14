@@ -118,8 +118,9 @@ func IsChecksumEq(l Checksum256, r Checksum256) bool {
 
 // EnableDetailLogs enable logs for chain package
 func EnableDetailLogs() {
-	eos.EnableEncoderLogging()
-	eos.EnableDecoderLogging()
-	eos.EnableABIEncoderLogging()
-	eos.EnableABIDecoderLogging()
+	// FIXME: log
+	// eos.EnableEncoderLogging()
+	// eos.EnableDecoderLogging()
+	// eos.EnableABIEncoderLogging()
+	// eos.EnableABIDecoderLogging()
 }
