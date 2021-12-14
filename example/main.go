@@ -9,8 +9,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/eosforce/eos-p2p/p2p"
-	"github.com/eosforce/eos-p2p/store"
+	"github.com/fanyang1988/eos-p2p/p2p"
+	"github.com/fanyang1988/eos-p2p/store"
 )
 
 var peer = flag.String("peer", "", "peer to connect to")

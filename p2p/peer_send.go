@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/eosforce/eos-p2p/types"
+	"github.com/fanyang1988/eos-p2p/types"
 )
 
 // WriteP2PMessage write a p2p msg to peer
